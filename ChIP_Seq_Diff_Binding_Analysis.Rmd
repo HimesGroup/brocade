@@ -1,0 +1,355 @@
+---
+title: "Differential Binding Analysis of ChIP Seq data GSE95632"
+author: "Avantika Diwadkar (avantika.diwadkar@pennmedicine.upenn.edu). Using code chunks from DiffBind.Rmd by Mengyuan Kan (mengykan@upenn.edu)"
+output:
+  html_document:
+    toc: TRUE
+    depth: 3
+editor_options: 
+  chunk_output_type: console
+---
+***
+
+
+
+####SETUP
+Installing the following packages if not already present
+```{r setup, eval=F, echo=F, message=F, warning=F}
+source("https://bioconductor.org/biocLite.R")
+biocLite("DiffBind")
+install.packages("plyr")
+install.packages("dplyr")
+install.packages("pander")
+install.packages("DT")
+```
+
+####LOADING LIBRARIES
+Loading the required libraries
+```{r lib, eval=T, echo=F, message=F, warning=F}
+library(DiffBind)
+library(pander)
+library(plyr)
+library(dplyr)
+library(DT)
+```
+
+Read in Phenotype file with SRR numbers
+```{r pheno_file, eval=F, echo=T}
+pheno_file =  read.table("results/GSE95632_Phenotype_withoutQC.txt", sep="\t")
+colnames(pheno_file) <- c("SRR","SampleID","ID","Species","Tissue","Treatment","genome","Antibody","Ab+Treatment")
+DT::datatable(pheno_file, rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
+
+```
+
+Subset samples and add other columns to make .csv file
+```{r diffbind_file, eval=F, echo=T}
+#Remove input controls
+pheno.main <- pheno_file[-c(2,5,17,18),] %>%select("SampleID")
+
+#Peak file paths
+Ab = as.factor(gsub(" .*","",pheno.main$SampleID))
+Code = as.factor(gsub(".*_","",pheno.main$SampleID))
+s_names <- as.factor(paste(Ab,Code,sep = "_"))
+
+#Wrangle and edit columns to get necessary format
+#SampleID
+pheno.main$SampleID <- as.factor(gsub(".*_","",pheno.main$SampleID))
+#Tissue
+pheno.main$Tissue <- as.factor("ASM")
+#Factor
+pheno.main$Factor<- as.factor(pheno_file$Antibody[-c(2,5,17,18)])     
+#Treatment
+pheno.main$Condition <- as.factor(c("control","control","dex","dex","dex_GFP","dex_GFP","dex_KLF","dex_KLF","control","control","dex","dex","dex_GFP","dex_GFP","dex_KLF","dex_KLF"))
+pheno.main$Treatment <- as.factor(pheno.main$Condition)
+#Replicates
+pheno.main$Replicate <- as.factor(c(1,2))
+#ControlID
+pheno.main$ControlID <- as.factor(c("1D_input","1D_input","2A_input","2A_input","2A_input","2A_input","2A_input","2A_input"))
+
+#File paths
+srr_nos <- pheno_file[-c(2,5,17,18),]%>%select("SRR")
+pheno.main$bamReads <- as.factor(paste("/Users/diwadkar/Desktop/ChIP-Seq/GSE95632/data/bam/",srr_nos$SRR,".bam",sep=""))
+pheno.main$bamControl <- as.factor(paste("/Users/diwadkar/Desktop/ChIP-Seq/GSE95632/data/bam/",c("SRR5309352","SRR5309352","SRR5309355","SRR5309355","SRR5309355","SRR5309355","SRR5309355","SRR5309355"),".bam",sep=""))
+pheno.main$Peaks <- as.factor(paste("/Users/diwadkar/Desktop/ChIP-Seq/GSE95632/data/macs2/",s_names,"_peaks.narrowPeak",sep=""))
+pheno.main$PeakCaller <- as.factor("bed")
+rownames(pheno.main) <- seq(length=nrow(pheno.main)) 
+
+#View
+#GR
+pheno.gr <- pheno.main %>% filter(Factor=="GR")
+DT::datatable(pheno.gr, rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
+write.csv(pheno.gr,"~/Desktop/ChIP-Seq/GSE95632/GSE95632info_gr.csv",row.names=FALSE)
+#RNAP2
+pheno.rp <- pheno.main %>% filter(Factor=="RNAP2")
+DT::datatable(pheno.rp, rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
+write.csv(pheno.rp,"~/Desktop/ChIP-Seq/GSE95632/GSE95632info_rp.csv",row.names=FALSE)
+```
+
+
+### Obtaining differentially bound sites
+
+#### Reading in the peaksets
+
+Set up an experiment to analyze is with a sample sheet (.csv). The peaksets are read in using the dba function.
+
+The metadata shows how many peaks (108812 sites) after merging overlapping ones (140789 total), and  the dimensions of dba.plotPCA (default binding matrix of 16 samples by the N sites that overlap in at least two of the samples).
+
+A correlation heatmap gives an initial clustering of the samples using the cross-correlations of each row of the binding matrix.
+```{r diffbind_readin, eval=T, echo=T}
+#GR
+dat.gr <- dba(sampleSheet="/Users/diwadkar/Desktop/ChIP-Seq/GSE95632/GSE95632info_gr.csv") 
+plot(dat.gr)
+
+#RNAP2
+dat.rp <- dba(sampleSheet="/Users/diwadkar/Desktop/ChIP-Seq/GSE95632/GSE95632info_rp.csv") 
+plot(dat.rp)
+```
+
+
+#### Counting reads
+
+The next step is to calculate a binding matrix with scores based on read counts for every
+sample (affinity scores), rather than confidence scores for only those peaks called in a specific sample (occupancy scores).
+
+Use dba.count function. The current study is based on a transcription factor GR that binds to the DNA, resulting in "punctate", narrow peaks, it is advisable to use the "summits" option to re-center each peak around the point of greatest enrichment. This keeps the peaks at a consistent width (in this case, with summits=250, the peaks will be 500bp, extending 250bp up- and down- stream of the summit).
+
+If you do not have the raw reads available to you, this object is available loading using e.g. data(tamoxifen_counts).
+```{r diffbind_readscount, eval=T, echo=T}
+#GR
+dat.gr <- dba.count(dat.gr,summits=250) # This step takes a while
+#RNAP2
+dat.rp <- dba.count(dat.rp,summits=250)
+```
+
+This shows that all the samples are using the same, 82032 length consensus peakset. Also, a
+new column has been added, called FRiP (Fraction of Reads in Peaks). This is the proportion of reads for that sample that overlap a peak in the consensus peakset, and can be used to indicate which samples show more enrichment overall.
+```{r diffbind_readscount_tb, eval=T, echo=T}
+dat.gr
+dat.rp
+```
+
+Plot a new correlation heatmap based on the affinity scores.
+```{r diffbind_readscount_plot, eval=T, echo=T}
+plot(dat.gr)
+plot(dat.rp)
+```
+
+#### Establishing a contrast
+
+Before running the differential analysis, we need to tell DiffBind which cell lines fall in which groups.
+
+This uses the Condition metadata (dex vs. control) to set up a contrast with 2 samples in the dex group and 2 samples in control group.
+
+The comparison indicates the group 1 (dex) vs. group 2 (control)
+
+```{r diffbind_contrast, eval=T, echo=T}
+#GR
+dat.gr <- dba.contrast(dat.gr, group1=dat.gr$masks$dex, group2=dat.gr$masks$control, name1="dex", name2="control")
+dat.gr <- dba.contrast(dat.gr, group1=dat.gr$masks$dex_GFP, group2=dat.gr$masks$dex_KLF, name1="dex_GFP", name2="dex_KLF")
+#dat <- dba.contrast(dat, categories=DBA_CONDITION, minMembers=2)
+
+#RNAP2
+dat.rp <- dba.contrast(dat.rp, group1=dat.rp$masks$dex, group2=dat.rp$masks$control, name1="dex", name2="control")
+dat.rp <- dba.contrast(dat.rp, group1=dat.rp$masks$dex_GFP, group2=dat.rp$masks$dex_KLF, name1="dex_GFP", name2="dex_KLF")
+#dat <- dba.contrast(dat, categories=DBA_CONDITION, minMembers=2)
+```
+
+#### Performing the differential analysis
+
+The default analysis will run an DESeq2 analysis using the default binding matrix. The resultant DBA object shows that 37582 of the 82032 sites are identified as being significantly differentially bound (DB) using a FDR <= 0.05. A correlation heatmap can be plotted, based on the result of the analysis.
+
+```{r diffbind_DE, eval=T, echo=T}
+#GR - dex vs control
+dat.gr <- dba.analyze(dat.gr)
+dat.gr
+plot(dat.gr, contrast=1)
+plot(dat.gr, contrast=2)
+
+#GR - GFP dex vs KLF dex
+#dat.gr2 <- dba.analyze(dat.gr2)
+#dat.gr2
+#plot(dat.gr2, contrast=1)
+
+#RNAP2 - dex vs control
+dat.rp <- dba.analyze(dat.rp)
+dat.rp
+plot(dat.rp, contrast=1)
+plot(dat.rp, contrast=2)
+
+#RNAP2 - GFP dex vs KLF dex
+#dat.rp2 <- dba.analyze(dat.rp2)
+#dat.rp2
+#plot(dat.rp2, contrast=1)
+```
+
+#### Retrieve the differentially bound sites
+
+The output is a GRanges object, appropriate for downstream processing.
+
+The value columns show:
+
+* the mean read concentration over all the samples: the default calculation uses log2 normalized ChIP read counts with control read counts subtracted
+* the mean concentration of the first (dex) group
+* the mean concentration of second (control) group
+* the Fold column shows the difference in mean concentrations between the two groups (Conc_dex - Conc_control): a positive value indicating increased binding affinity in the dex group and a negative value indicating increased binding affinity in the control group.
+* a raw p-value: confidence measures for identifying these sites as differentially
+bound
+* FDR: a multiple testing corrected FDR in the final column.
+
+```{r diffbind_report, eval=T, echo=T}
+#GR1
+dat.gr.DB <-  dba.report(dat.gr)
+dat.gr.DB
+
+#GR2
+#dat.gr2.DB <-  dba.report(dat.gr2)
+#dat.gr2.DB
+
+#RNAP2
+dat.rp.DB <-  dba.report(dat.rp)
+dat.rp.DB
+
+#RNAP2
+#dat.rp2.DB <-  dba.report(dat.rp2)
+#dat.rp2.DB
+```
+
+####Visualization
+
+###PCA
+
+A PCA plot shows a better understanding of clustering and association between samples than heatmaps. 
+```{r pca_plot, eval=T, echo=T}
+#PCA plot for normalized read counts for all binding sites
+dba.plotPCA(dat.gr,DBA_TREATMENT,label=DBA_CONDITION)
+#dba.plotPCA(dat.gr2,DBA_TREATMENT,label=DBA_CONDITION)
+#dba.plotPCA(dat,DBA_FACTOR,label=DBA_CONDITION)
+#dba.plotPCA(dat.rp1,DBA_TREATMENT,label=DBA_CONDITION)
+dba.plotPCA(dat.rp,DBA_TREATMENT,label=DBA_CONDITION)
+
+
+#PCA plot using only the differentially bound sites, using an FDR threshold of 0.05
+dba.plotPCA(dat.gr,contrast = 1,label=DBA_REPLICATE)
+dba.plotPCA(dat.gr,contrast = 2,label=DBA_REPLICATE)
+#dba.plotPCA(dat.gr1,contrast = 1,label=DBA_TREATMENT)
+#dba.plotPCA(dat.gr2,contrast = 1,label=DBA_REPLICATE)
+#dba.plotPCA(dat.gr2,contrast = 1,label=DBA_TREATMENT)
+#dba.plotPCA(dat,contrast = 1,label=DBA_FACTOR)
+
+#RNAP2
+dba.plotPCA(dat.rp,contrast = 1,label=DBA_REPLICATE)
+dba.plotPCA(dat.rp,contrast = 2,label=DBA_REPLICATE)
+#dba.plotPCA(dat.rp1,contrast = 1,label=DBA_TREATMENT)
+#dba.plotPCA(dat.rp2,contrast = 1,label=DBA_REPLICATE)
+#dba.plotPCA(dat.rp2,contrast = 1,label=DBA_TREATMENT)
+```
+
+###MA PLOTS
+
+MA plots are a useful way to visualize the effect of normalization on data, as well as seeing which of the datapoints are being identified as differentially bound. An MA plot can be
+obtained for the control vs dex treatment cell: 
+```{r ma_plot, eval=T, echo=T}
+dba.plotMA(dat.gr)
+dba.plotMA(dat.rp)
+
+#Same data shown with the concentrations of each sample groups plotted against each other - 
+dba.plotMA(dat.gr, bXY=TRUE)
+#dba.plotMA(dat.gr2, bXY=TRUE)
+dba.plotMA(dat.rp, bXY=TRUE)
+#dba.plotMA(dat.rp2, bXY=TRUE)
+```
+
+
+###VOLCANO PLOTS
+
+Volcano plots also highlight significantly differentially bound sites and show their fold changes.
+
+```{r vol_plot, eval=T, echo=T}
+dba.plotVolcano(dat.gr)
+#dba.plotVolcano(dat.gr2)
+dba.plotVolcano(dat.rp)
+#dba.plotVolcano(dat.rp2)
+
+```
+
+###BOXPLOTS
+
+Box plots of read distributions for significantly differentially bound (DB) sites - 
+The plot shows in the first two boxes that amongst differentially bound sites
+overall, the dex samples have a somewhat higher mean read concentration. The next
+two boxes show the distribution of reads in differentially bound sites that exhibit increased
+affinity in the dex samples, while the final two boxes show the distribution of reads in
+differentially bound sites that exhibit increased affinity in the Control samples.
+
+Pvals is a matrix of p-values (computed using a two-sided Wilcoxon ‘MannWhitney’ test, paired where appropriate) 
+indicating which of these distributions are significantly different from another distribution.
+
+```{r box_plot, eval=T, echo=T}
+#GR1
+sum(dat.gr.DB$Fold<0)
+sum(dat.gr.DB$Fold>0)
+
+pvals1 <- dba.plotBox(dat.gr)
+pvals1
+
+#GR2
+#sum(dat.gr2.DB$Fold<0)
+#sum(dat.gr2.DB$Fold>0)
+
+#pvals2 <- dba.plotBox(dat.gr2)
+#pvals2
+
+#RNAP2-1
+sum(dat.rp.DB$Fold<0)
+sum(dat.rp.DB$Fold>0)
+
+pvals3 <- dba.plotBox(dat.rp)
+pvals3
+
+#RNAP2-2
+#sum(dat.rp2.DB$Fold<0)
+#sum(dat.rp2.DB$Fold>0)
+
+#pvals4 <- dba.plotBox(dat.rp2)
+#pvals4
+```
+
+
+###HEATMAPS
+
+```{r heatmap, eval=T, echo=T}
+#GR
+#Simple heatmap
+corvals1 <- dba.plotHeatmap(dat.gr)
+
+#Binding affinity heatmap
+corvals1 <- dba.plotHeatmap(dat.gr, contrast=1, correlations=FALSE)
+corvals1 <- dba.plotHeatmap(dat.gr, contrast=2, correlations=FALSE)
+
+#Simple heatmap
+#corvals2 <- dba.plotHeatmap(dat.gr2)
+
+#Binding affinity heatmap
+#corvals2 <- dba.plotHeatmap(dat.gr2, contrast=1, correlations=FALSE)
+
+#RNAP2
+#Simple heatmap
+corvals3 <- dba.plotHeatmap(dat.rp)
+
+#Binding affinity heatmap
+corvals3 <- dba.plotHeatmap(dat.rp, contrast=1, correlations=FALSE)
+corvals3 <- dba.plotHeatmap(dat.rp, contrast=2, correlations=FALSE)
+
+#Simple heatmap
+#corvals4 <- dba.plotHeatmap(dat.rp2)
+
+#Binding affinity heatmap
+#corvals4 <- dba.plotHeatmap(dat.rp2, contrast=1, correlations=FALSE)
+```
+
+
+#### Session information
+
+```{r sessioninfo, eval=T, echo=F}
+pander(sessionInfo())
+```

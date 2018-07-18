@@ -2,6 +2,7 @@ brocade
 ======
 
 Reproducible ChIP-Seq analysis pipeline.
+
 Authors: Avantika Diwadkar, Mengyuan Kan, Blanca Himes.
 
 ## Introduction

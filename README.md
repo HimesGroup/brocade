@@ -11,7 +11,7 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
 
 * SRA Data Download
 * Phenotype Preparation
-* Read Alignments to Human Genome
+* Alignment to Human Genome
 * Quality Control Metrics
 * Identify TF binding sites by Peak calling
 * Differential Binding Analysis

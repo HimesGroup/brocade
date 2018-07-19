@@ -1,0 +1,208 @@
+---
+title: "ChIP Seq Annotation Script"
+author: "Avantika Diwadkar (avantika.diwadkar@pennmedicine.upenn.edu)"
+output:
+  html_document:
+    toc: TRUE
+    depth: 3
+editor_options: 
+chunk_output_type: console
+---
+***
+
+This report carries out annotation and visualization of differentially bound peaks/sites identified by processing ChIP-Seq data from GEO study. The steps involved are:
+
+* Distribution of peak counts across the TSS region
+* Annotation of the enriched regions
+* Visualization of differentially bound sites to compare distance from TSS, annotations and overlap
+
+Input:
+
+A pre-prepared output file with a GRanges object saved from running ChIP_Seq_Diff_Binding_Analysis.Rmd script.
+
+The input columns should show:
+
+* the mean read concentration over all the samples: the default calculation uses log2 normalized ChIP read counts with control read counts subtracted
+* the mean concentration of the first (dex) group
+* the mean concentration of second (control) group
+* the Fold column shows the difference in mean concentrations between the two groups (Conc_dex - Conc_control): a positive value indicating increased binding affinity in the dex group and a negative value indicating increased binding affinity in the control group.
+* a raw p-value: confidence measures for identifying these sites as differentially
+bound
+* FDR: a multiple testing corrected FDR in the final column.
+
+Outputs:
+
+* Gene Annotation of the GRanges input file(s) (.bed/.txt)
+* A ChIP-Seq annotation and visualization report (.html)
+
+
+Manually change the variables for files (file1,file2) and conditions as well as txdb depending upon the genome used
+```{r var_set, eval=T, echo=F, message=F, warning=F }
+file1 = "/Users/diwadkar/Desktop/ChIP-Seq/GR_DB_sites.txt"
+file2 = "/Users/diwadkar/Desktop/ChIP-Seq/RP_DB_sites.txt"
+files = c(file1,file2)
+conditions = c("GR","RNAP2")
+```
+
+Install the prerequisite R packages if they do not exist
+
+* ChIPseeker
+* TxDb.Hsapiens.UCSC.hg38.knownGene
+* clusterProfiler
+* org.Hs.eg.db
+* dplyr and plyr
+* pander
+
+```{r pckgs, eval=F, echo=F, message=F, warning=F}
+source("https://bioconductor.org/biocLite.R")
+biocLite("ChIPseeker")
+biocLite("TxDb.Hsapiens.UCSC.hg38.knownGene")
+biocLite("clusterProfiler")
+biocLite("org.Hs.eg.db")
+```
+
+Loading the required libraries
+
+```{r lib, eval=T, echo=F, message=F, warning=F}
+library(ChIPseeker)
+library(pander)
+library(plyr)
+library(dplyr)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+```
+
+
+####PRE-ANNOTATION ANALYSIS AND VISUALIZATION 
+
+Read-in  and view your input files
+```{r read_file, eval=T, echo=F, message=F, warning=F}
+peak1 <- readPeakFile(file1[[1]])
+peak2 <- readPeakFile(file2[[1]])
+txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+
+#GR results
+head(as.data.frame(peak1))
+
+#RNAP2 results
+head(as.data.frame(peak2))
+```
+
+####Distribution of peaks across all chromosomes in the genome
+
+Visualization of peaks across all chromosomes
+```{r peak_plot, eval=T, echo=F, message=F, warning=F}
+covplot(peak1, weightCol = "Conc")
+covplot(peak2, weightCol = "Conc")
+```
+
+####Profiling of TSS region CHIP-Seq peaks
+
+```{r peakHeatmap,eval=T, echo=F, message=F, warning=F}
+peakHeatmap(file1[[1]], TxDb = txdb, upstream = 3000,downstream = 3000, color = "red")
+peakHeatmap(file2[[1]], TxDb = txdb, upstream = 3000,downstream = 3000, color = "blue")
+```
+
+
+####Read Count Frequency across TSS of gene in upstream direction (5' to 3')
+
+```{r plotAvgProf,eval=T, echo=F, message=F, warning=F}
+plotAvgProf2(file1[[1]], TxDb = txdb, upstream = 3000, downstream = 3000, xlab = "Genomic Region (5'->3')",ylab = "Read Count Frequency of GR")
+plotAvgProf2(file2[[1]], TxDb = txdb, upstream = 3000, downstream = 3000, xlab = "Genomic Region (5'->3')",ylab = "Read Count Frequency of RNAP2")
+```
+
+####ANNOTATION OF ENRICHED REGIONS IN THE DATASET
+
+Annotation of Peaks for Condition 1
+```{r annotate_gr, eval=T, echo=F, message=F, warning=F}
+peakAnno1 <- annotatePeak(peak=file1[[1]], tssRegion = c(-3000,3000),TxDb = txdb,annoDb = "org.Hs.eg.db")
+head(as.data.frame(peakAnno1))
+
+peakAnno.one.db <- as.GRanges(peakAnno1)
+write.table(peakAnno.one.db,paste0("Peaks.",conditions[1],".Annotated.txt"),sep="\t",row.names = FALSE)
+
+plotAnnoPie(peakAnno1)
+
+plotAnnoBar(peakAnno1)
+
+plotDistToTSS(peakAnno1)
+```
+
+
+Annotation of Peak for Condition 2
+```{r annotate_rp, eval=T, echo=F, message=F, warning=F}
+peakAnno2 <- annotatePeak(peak=file2[[1]], tssRegion = c(-3000,3000),TxDb = txdb,annoDb = "org.Hs.eg.db")
+head(as.data.frame(peakAnno2))
+
+peakAnno.two.db <- as.GRanges(peakAnno2)
+write.table(peakAnno.two.db,paste0("Peaks.",conditions[2],".Annotated.txt"),sep="\t",row.names = FALSE)
+
+plotAnnoPie(peakAnno2)
+
+plotAnnoBar(peakAnno2)
+
+plotDistToTSS(peakAnno2)
+```
+
+####Functional enrichment analysis
+
+Enrichment analysis is a widely used approach to identify biological themes and investigate whether the number 
+of selected genes associated with a particular biological term is larger than expected, using packages like DOSE for Disease Ontology, 
+ReactomePA for reactome pathway, clusterProfiler for Gene Ontology and KEGG enrichment analysis.
+
+```{r enrich_GO, eval=T, echo=F, message=F, warning=F}
+bp1 <- enrichGO(unlist(peakAnno.one.db$geneId), OrgDb="org.Hs.eg.db", ont = "BP",readable = TRUE)
+head(as.data.frame(bp1))
+
+bp2 <- enrichGO(unlist(peakAnno.two.db$geneId), OrgDb="org.Hs.eg.db", ont = "BP",readable = TRUE)
+head(as.data.frame(bp2))
+```
+
+
+####COMPARISON OF DIFFERENTIALLY BOUND ENRICHED SITES
+
+This section compares annotations and distribution of peaks idenitfied in the two conditions. Input for this is both files together. 
+
+The plot and heatmap looks at the distribution of peak count frequency from TSS of the genes in upstream direction for the two conditions.
+
+```{r tagMatrix, eval=T, echo=F, message=F, warning=F}
+promoter <- getPromoters(TxDb=txdb,upstream=3000, downstream=3000) 
+tagMatrixList <- lapply(files, getTagMatrix, windows=promoter)
+tagMatrixList <- setNames(tagMatrixList, conditions)
+plotAvgProf(tagMatrixList, xlim = c(-3000, 3000))
+
+tagHeatmap(tagMatrixList, xlim = c(-3000, 3000), color = NULL)
+```
+
+
+####BARPLOTS
+
+The first bar plot look at annotation differences in feature distribution of the two conditions where features include promotor regions, UTRs, exons, introns, and distal intergenic regions. 
+The second bar plot looks at percentage distribution of TF-binding loci position relative to TSS of the genes.
+
+```{r peakAnno, eval=T, echo=F, message=F, warning=F}
+peakAnnoList <- lapply(files, annotatePeak, TxDb = txdb, tssRegion = c(-3000, 3000), verbose = FALSE)
+peakAnnoList <- setNames(peakAnnoList, conditions)
+plotAnnoBar(peakAnnoList)
+plotDistToTSS(peakAnnoList)
+```
+
+
+####VENNPLOT
+
+Venn Diagram looks into overlap of genes annotated to enriched regions in the two conditions.
+
+```{r venn,eval=T, echo=F, message=F, warning=F}
+genes1 = peakAnno.one.db$SYMBOL
+genes2 = peakAnno.two.db$SYMBOL
+genes = list(genes1, genes2)
+genes = setNames(genes, conditions)
+vennplot(genes)
+```
+
+#### Session information
+
+```{r sessioninfo, eval=T, echo=F}
+pander(sessionInfo())
+```

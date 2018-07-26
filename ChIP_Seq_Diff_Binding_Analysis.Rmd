@@ -200,7 +200,8 @@ bound
 #GR1
 dat.gr.DB <-  dba.report(dat.gr)
 dat.gr.DB
-write.table(dat.gr.DB, "GR_DB_sites.txt",sep = "\t",row.names=FALSE)
+dat.gr_df <- as.data.frame(dat.gr.DB)
+write.table(dat.gr_df, "GR_DB_sites.txt",sep = "\t",row.names=FALSE)
 
 #GR2
 #dat.gr2.DB <-  dba.report(dat.gr2)
@@ -209,7 +210,8 @@ write.table(dat.gr.DB, "GR_DB_sites.txt",sep = "\t",row.names=FALSE)
 #RNAP2
 dat.rp.DB <-  dba.report(dat.rp)
 dat.rp.DB
-write.table(dat.rp.DB, "RP_DB_sites.txt",sep = "\t",row.names=FALSE)
+dat.rp_df <- as.data.frame(dat.rp.DB)
+write.table(dat.rp_df, "RP_DB_sites.txt",sep = "\t",row.names=FALSE)
 
 #RNAP2
 #dat.rp2.DB <-  dba.report(dat.rp2)

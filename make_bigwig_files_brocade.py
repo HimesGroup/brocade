@@ -28,7 +28,7 @@ def make_track_file(path_start,project):
         lab = i.split(".bdg")
         labels.append(lab[0])
     	
-    	#Get a dictionary of colors for conditions in info_sheet
+    #Get a dictionary of colors for conditions in info_sheet
     colors = ["0,0,400", "400,0,0", "0,0,100", "100,0,0", "200,200,0", "0,200,200"]
     color_dic = {}
     for i in range(len(conditions)):
@@ -39,7 +39,7 @@ def make_track_file(path_start,project):
     output_url = "http://public.himeslab.org/"
     
     
-    	#Write out each line of the track names file
+    #Write out each line of the track names file
     count=0
     for k in files:
         curr_bigwig = output_url+project+"/"+labels[count]+".bw"
@@ -62,7 +62,7 @@ def make_track_file(path_start,project):
 
 def main(project_name,ref_genome):
     """
-	Creates sorted bedgraph and bigwig files of all samples for a batch for visualization in UCSC genome browser
+    Creates sorted bedgraph and bigwig files of all samples for a batch for visualization in UCSC genome browser
 	"""
     path_start = os.getcwd()
     if path_start[-1] != "/":
@@ -73,8 +73,8 @@ def main(project_name,ref_genome):
     bedgraph_out = out_dir+"bedGraph/"
 
     bigwig_out = bedgraph_out+"bigwig/"
-    #if not os.path.exists(bigwig_out):
-        #os.makedirs(bigwig_out)
+    if not os.path.exists(bigwig_out):
+        os.makedirs(bigwig_out)
 		
     runs= make_track_file(path_start,project_name)
     files, labels = runs

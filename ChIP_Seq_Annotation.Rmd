@@ -70,6 +70,7 @@ library(pander)
 library(plyr)
 library(dplyr)
 library(ggplot2)
+library(DT)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 library(clusterProfiler)
 library(org.Hs.eg.db)
@@ -106,7 +107,7 @@ Thus, you can visualize peaks across all chromosomes for the different condition
 
 ```{r peak_plot, eval=T, echo=F, message=F, warning=F}
 df <- data.frame(Ab=conditions,Peaks = c(length(peak1),length(peak2)))
-g <- ggplot(df, aes(x=Ab,y=Peaks,fill=Ab)) + geom_bar(stat = "identity",width = 0.3) + coord_flip() 
+g <- ggplot(df, aes(x=Ab,y=Peaks,fill=Ab)) + geom_bar(stat = "identity",width = 0.3) + geom_text(aes(label = Peaks),position = position_dodge(width = 1),vjust=-0.5,size = 3) 
 g <- g + theme_bw() + ggtitle("Peak count distribution for the two conditions") + labs(y="Peak counts",x="Antibody type") 
 g
 
@@ -229,9 +230,9 @@ The ReactomePA package provides a function, seq2gene, for linking genomc regions
 This function is designed to link both coding and non-coding genomic regions to coding genes and facilitate functional analysis.
 
 ```{r reactome_pa2, eval=T, echo=F, message=F, warning=F}
-genes = lapply(peakAnnoList, function(i) as.data.frame(i)$geneId)
-names(genes) = sub("_", "\n", names(genes))
-compKEGG <- compareCluster(geneCluster   = genes,
+all_genes = lapply(peakAnnoList, function(i) as.data.frame(i)$geneId)
+names(all_genes) = sub("_", "\n", names(all_genes))
+compKEGG <- compareCluster(geneCluster   = all_genes,
                          fun           = "enrichKEGG",
                          pvalueCutoff  = 0.05,
                          pAdjustMethod = "BH")
@@ -241,14 +242,34 @@ dotplot(compKEGG, showCategory = 15, title = "KEGG Pathway Enrichment Analysis")
 
 ####VENNPLOT
 
-Venn Diagram looks into overlap of genes annotated to enriched regions in the two conditions.
+Venn Diagram looks into overlap of genes annotated to enriched regions in the two conditions with fold change greater than 2. The table shows all the overlapped genes. 
 
 ```{r venn,eval=T, echo=F, message=F, warning=F}
-genes1 = peakAnno.one.db$SYMBOL
-genes2 = peakAnno.two.db$SYMBOL
+#genes1 <- (as.data.frame(peakAnno.one.db) %>% filter(abs(Fold) > 2))$SYMBOL
+#genes2 <- (as.data.frame(peakAnno.two.db) %>% filter(abs(Fold) > 2))$SYMBOL
+genes1 <- (as.data.frame(peakAnno.one.db))$SYMBOL
+genes2 <- (as.data.frame(peakAnno.two.db))$SYMBOL           
 genes = list(genes1, genes2)
 genes = setNames(genes, conditions)
 vennplot(genes)
+overlap_genes <- data.frame(Genes=intersect(genes1,genes2))
+DT::datatable(overlap_genes, rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
+
+#Get conc for specific genes in both conditions
+GR_df <- as.data.frame(peakAnno.one.db) 
+col_names <- names(GR_df)
+GR_df[col_names] <- lapply(GR_df[col_names] , factor)
+GR_df <-  GR_df %>% dplyr::select(Fold,SYMBOL) %>% filter(SYMBOL %in% overlap_genes$Genes)
+GR_df$p.value <- NULL
+
+RP_df <- as.data.frame(peakAnno.two.db) 
+col_names <- names(RP_df)
+RP_df[col_names] <- lapply(RP_df[col_names] , factor)
+RP_df <-  RP_df %>% dplyr::select(Fold,SYMBOL) %>% filter(SYMBOL %in% overlap_genes$Genes)
+RP_df$p.value <- NULL
+
+main_df <- merge(GR_df, RP_df, by="SYMBOL")
+colnames(main_df) <- c("SYMBOL","GR","RNAP2")
 ```
 
 #### Session information

@@ -38,8 +38,8 @@ Outputs:
 
 Manually change the variables for files (file1,file2) and conditions as well as txdb depending upon the genome used
 ```{r var_set, eval=T, echo=F, message=F, warning=F }
-file1 = "/Users/diwadkar/Desktop/ChIP-Seq/GR_DB_sites.txt"
-file2 = "/Users/diwadkar/Desktop/ChIP-Seq/RP_DB_sites.txt"
+file1 = "~/Desktop/ChIP-Seq/final_scripts/GR_DB_sites.txt"
+file2 = "~/Desktop/ChIP-Seq/final_scripts/RP_DB_sites.txt"
 files = c(file1,file2)
 conditions = c("GR","RNAP2")
 ```
@@ -60,6 +60,8 @@ biocLite("TxDb.Hsapiens.UCSC.hg38.knownGene")
 biocLite("clusterProfiler")
 biocLite("org.Hs.eg.db")
 biocLite("ReactomePA")
+biocLite("GenomicFeatures")
+biocLite("RMariaDB")
 ```
 
 Loading the required libraries
@@ -75,6 +77,7 @@ library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 library(clusterProfiler)
 library(org.Hs.eg.db)
 library(GenomicRanges)
+library(GenomicFeatures)
 library(ReactomePA)
 ```
 
@@ -85,8 +88,14 @@ Read-in  and view your input files
 ```{r read_file, eval=T, echo=F, message=F, warning=F}
 peak1 <- readPeakFile(file1[[1]])
 peak2 <- readPeakFile(file2[[1]])
+
+#UCSC database
 txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
-#seqlevels(txdb) <- seqlevels(txdb)[1:24]
+
+#RefSeq database alternative
+#hg38.refseq.db <- makeTxDbFromUCSC(genome="hg38", table="refGene")
+
+#Chr list
 nos <-  unlist(list(seq(1:22),"X","Y"))
 chrs <- unlist(lapply(nos, function(x) paste0("chr",x)))
 
@@ -131,7 +140,7 @@ The genomic region of the peak is reported in the annotation column where the re
 Annotation of Peaks for Condition 1: GR binding
 
 ```{r annotate_gr, eval=T, echo=F, message=F, warning=F}
-peakAnno1 <- annotatePeak(peak=file1[[1]], tssRegion = c(-3000,3000),TxDb = txdb,annoDb = "org.Hs.eg.db")
+peakAnno1 <- annotatePeak(peak=file1[[1]], tssRegion = c(-3000,3000),TxDb = txdb,annoDb = "org.Hs.eg.db",overlap='all')
 head(as.data.frame(peakAnno1))
 
 peakAnno.one.db <- as.GRanges(peakAnno1)
@@ -149,7 +158,7 @@ upsetplot(peakAnno1)
 Annotation of Peak for Condition 2: RNAP2 binding
 
 ```{r annotate_rp, eval=T, echo=F, message=F, warning=F}
-peakAnno2 <- annotatePeak(peak=file2[[1]], tssRegion = c(-3000,3000),TxDb = txdb,annoDb = "org.Hs.eg.db")
+peakAnno2 <- annotatePeak(peak=file2[[1]], tssRegion = c(-3000,3000),TxDb = txdb,annoDb = "org.Hs.eg.db",overlap='all')
 head(as.data.frame(peakAnno2))
 
 peakAnno.two.db <- as.GRanges(peakAnno2)

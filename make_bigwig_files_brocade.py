@@ -48,7 +48,7 @@ def make_track_file(path_start,project):
         cond = (labels[count].split("_"))[0]
         outp.write("color="+color_dic[cond])
         #outp.write(" gridDefault=on maxHeightPixels=50 visibility=full autoScale=off viewLimits=0:13000 description=")
-        outp.write(" gridDefault=on maxHeightPixels=50 visibility=full autoScale=on description=")
+        outp.write(" gridDefault=on maxHeightPixels=50 visibility=full autoScale=off description=")
         outp.write(labels[count]+"\" bigDataUrl=")
         outp.write(curr_bigwig+"\n")
         count += 1

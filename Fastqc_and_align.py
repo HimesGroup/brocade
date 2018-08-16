@@ -13,8 +13,6 @@ import urllib
 import urllib.request
 from SRAdownload import *
 
-
-
 #Perform FASTQC on the sample files
 fastq_cmd = "fastqc %s/fastq/*.fastq.gz  -o %s/"%(geo_dir,res_dir)
 
@@ -54,7 +52,7 @@ if __name__ == '__main__':
 	print("Fastqc in progress")
 	#subprocess.call(fastq_cmd,shell=True)
 
-	#Set up hg38 if not already present
+	#Set up hg38  or the required genome if not already present
 	#download_file(hg_url, ref_path)
 	print("Downloaded hg38.fa.gz")
 	#subprocess.call(g_cmd,shell=True)
@@ -66,7 +64,6 @@ if __name__ == '__main__':
 	#Make bam and bwa folders in data directory
 	make_dir(bam_dir)    
 	make_dir(bwa_dir)
-
 
 	#Write alignment file
 	write_in_file("alignment.sh",Bcall)

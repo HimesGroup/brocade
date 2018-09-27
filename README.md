@@ -36,11 +36,12 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
 
   Commands:
   > python SRADownload.py #Enter GEO ID when prompted 
+
   > bsub < get_sra.lsf
 
   Output files:
-  > GEOID_analysis.Rmd 
-  > get_sra.lsf
-  > GEOID_analysis.Rmd
+  1) GEOID_analysis.Rmd 
+  2) get_sra.lsf
+  3) GEOID_analysis.Rmd
 
 

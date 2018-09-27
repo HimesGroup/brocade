@@ -32,7 +32,7 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
 ## Data Analysis Workflow
 
 ### Download Data
-* SRADownload.py script can be used to download the data and generate a phenotype file of the samples in the dataset. On running the file, you will be asked to input the GEO ID of the dataset you want to analyze. The script will then download the matrix phenotype file for the dataset using GEOquery, aquire the SRR numbers and download the data using the SRAdb R package. You can check the phenotype information in GEOID_Phenotype_withoutQC.txt file and check analysis outcome in html file generated. 
+* SRADownload.py script can be used to download the data and generate a phenotype file of the samples in the dataset. On running the script, you will be asked to input the GEO ID of the dataset you want to analyze. The script will then download the matrix phenotype file for the dataset using GEOquery, aquire the SRR numbers and download the data using the SRAdb R package. You can check the phenotype information in GEOID_Phenotype_withoutQC.txt file and check analysis outcome in html file generated. 
 
   Commands:
   > python SRADownload.py #Enter GEO ID when prompted 
@@ -46,7 +46,7 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
   * GEOID_Phenotype_withoutQC.txt
 
 ### Alignment and Quality Control
-* Fastqc_and_align.py script should be used next to get quality control metrics followed by alignment fo the data to the appropriate reference genome. Fastqc is used for quality control while we are using bwa and samtools to get sorted and indexed alignment bam files.
+* Fastqc_and_align.py script should be used next to get quality control metrics followed by alignment to the appropriate reference genome. Fastqc is used for quality control and bwa to get sorted and indexed alignment bam files.
 
 	Set up the hg38 reference genome:
 	> wget http://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz

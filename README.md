@@ -69,16 +69,16 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
 ### Peak Calling
 * Peakcalling.py allows you to find peaks from the aligned files. The script isn't automated yet so you need to manually change the samples in the Pcall string in the script. MACS2 software is used to identify peaks in the data. 
 
-Commands:
-> python Peakcalling.py #Enter all information prompted
+	Commands:
+	> python Peakcalling.py #Enter all information prompted
 
-> for i in macs2\*.lsf; do echo $i; bsub < $i; done
+	> for i in macs2\*.lsf; do echo $i; bsub < $i; done
 
-Output files:
-* GEOID_Phenotype_withoutQC_withSRR.txt : Phenotype file with added SRR number column.
-* peakcalling.sh : Script to make multiple lsf files.
-* macs2\*.lsf: LSF files to run peak calling for each sample comparison.
-* macs2 folder: All the results from the macs2 peak calling algorithm. Peaks in narrowPeak file. 
+	Output files:
+	* GEOID_Phenotype_withoutQC_withSRR.txt : Phenotype file with added SRR number column.
+	* peakcalling.sh : Script to make multiple lsf files.
+	* macs2\*.lsf: LSF files to run peak calling for each sample comparison.
+	* macs2 folder: All the results from the macs2 peak calling algorithm. Peaks in narrowPeak file. 
 
 
 

@@ -40,10 +40,10 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
   > bsub < get_sra.lsf
 
   Output files:
-  1) GEOID_analysis.Rmd 
-  2) get_sra.lsf
-  3) GEOID_analysis.Rmd
-  4) GEOID_Phenotype_withoutQC.txt
+  * GEOID_analysis.Rmd 
+  * get_sra.lsf
+  * GEOID_analysis.Rmd
+  * GEOID_Phenotype_withoutQC.txt
 
 ### Alignment and Quality Control
 * Fastqc_and_align.py script should be used next to get quality control metrics followed by alignment fo the data to the appropriate reference genome. Fastqc is used for quality control while we are using bwa and samtools to get sorted and indexed alignment bam files.
@@ -61,10 +61,10 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
 	> for i in chipseq_bwa\*.lsf; do echo $i; bsub < $i; done
 
 	Output files:
-	1) Fastqc folder : fastqc html files for each sample
-	2) bam folder : bam and bam.bai files for each sample
-	3) alignment.sh : To make lsf file for alignment of each sample
-	4) chipseq_bwa\*.lsf : LSF files to run bwa alignment on the reference genome
+	* Fastqc folder : fastqc html files for each sample
+	* bam folder : bam and bam.bai files for each sample
+	* alignment.sh : To make lsf file for alignment of each sample
+	* chipseq_bwa\*.lsf : LSF files to run bwa alignment on the reference genome
 
 ### Peak Calling
 * Peakcalling.py allows you to find peaks from the aligned files. The script isn't automated yet so you need to manually change the samples in the Pcall string in the script. MACS2 software is used to identify peaks in the data. 
@@ -75,10 +75,10 @@ Commands:
 > for i in macs2\*.lsf; do echo $i; bsub < $i; done
 
 Output files:
-1) GEOID_Phenotype_withoutQC_withSRR.txt : Phenotype file with added SRR number column.
-2) peakcalling.sh : Script to make multiple lsf files.
-3) macs2\*.lsf: LSF files to run peak calling for each sample comparison.
-4) macs2 folder: All the results from the macs2 peak calling algorithm. Peaks in narrowPeak file. 
+* GEOID_Phenotype_withoutQC_withSRR.txt : Phenotype file with added SRR number column.
+* peakcalling.sh : Script to make multiple lsf files.
+* macs2\*.lsf: LSF files to run peak calling for each sample comparison.
+* macs2 folder: All the results from the macs2 peak calling algorithm. Peaks in narrowPeak file. 
 
 
 

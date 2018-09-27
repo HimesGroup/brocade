@@ -17,17 +17,10 @@ from Fastqc_and_align import *
 
 
 #Add SRR sample IDs in the Phenotype file
-sample_file = "/home/diwadkar/samples.txt"
+sample_file =  data_dir + "/samples.txt"
+sfc = "ls bam_dir/*.bam | sed 's/.bam//g' > %s"%(sample_file)
 
-f=open(sample_file,"r")
-flines=f.readlines()
-#flines = lines[1:]
-result=[]
-for x in flines:
-    result.append(x.split('\n')[0])
-f.close()
-
-
+#Phenotype files
 phenotype_file = res_dir+"/"+geo_id+"_Phenotype_withoutQC.txt"
 new_phenotype_file = res_dir+"/"+geo_id+"_Phenotype_withoutQC_withSRR.txt"
 
@@ -78,6 +71,9 @@ macs2 callpeak -c $bam_dir/SRR5309355.bam -t $bam_dir/SRR5309370.bam -n RNAP2_9e
 
 
 if __name__ == '__main__':
+
+	#Make samples text file
+	subprocess.call(sfc, shell=True)
 
 	#Add SRR numbers to phenotype file
 	#if OS X then add '' -e after -i in sed

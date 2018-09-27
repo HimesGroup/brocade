@@ -5,34 +5,9 @@
 Created on Wed Jun  6 14:42:00 2018
 Author: Avantika Diwadkar (@diwadkar)
 
-Introduction:
-
-ChIP-Seq analysis is used to determine in-vivo protein-binding in the genome which involves exploring 
-binding of transcription factors(TFs),histones or nucleosomes. 
-ChIP-Seq analysis consists of the following steps:
-    1) Cross-linking of the protein of interest to the chromatin
-    2) Fragmentation of the chromatin by sonication
-    3) Immunoprecipitation(IP) to isolate the protein bound DNA by using an antibody specific to the protein.
-    4) Sequencing of the captured fragments using NGS
-        
-Commonly, this method is used to identify differential binding patterns of proteins of interest in 
-different disease conditions. Multiple reads mapped to a site produce a peak and controls used to eliminate
-false positives involve either an input DNA sample that has been crosslinked and sonicated but no IP performed or 
-IP with general, non-specific antibody like IgG.
-
-ChIP-Seq analysis pipeline overview:
-1) Download SRA fastq files and prepare phenotype file.
-2) Align and Peak calling with QC report
-3) Differential Binding(DB) and downstream processing (motif calling, gene ontology)
-    
-Packages used for each:
-    1) SRA download : R package SRAdb
-    2) Align :  Bowtie2/BWA
-    3) Peak calling: MACS2/Homer
-    4) 
 
 This script can be used to generate a phenotype file for any given ChIP-Seq dataset.
-This is followed by using the Sample ID information to acquire SRR numbers and download the 
+This is followed by using the this information to acquire SRR numbers and download the 
 fastq files from the server. 
 
 """
@@ -91,18 +66,9 @@ mat_cmd = "wget %s"%(matrix_file)
 
 Rcall = '''
 ---
-title: "ChiP-Seq analysis pipeline for demo"
+title: "SRA downlaod for brocade"
 output: html_document
 ---
-The following script helps carry out ChiP-Seq Analysis in an R environment to generate a final report with all the findings. 
-The steps involved in this workflow are :
-1) Data acquisition or GEO download
-2) Quality Control
-3) Alignment to the genome
-4) Peak calling, Annotation and overlapping reads count
-5) Differential binding analysis
-6) GO term enrichment analysis
-7) Motif analysis and discovery
 
 ```{r, echo=FALSE}
 knitr::opts_chunk$set(error = TRUE)
@@ -126,8 +92,8 @@ library(pander)
 #### Getting the ExpressionSet data from the matrix file
 Read in the matrix data file and assign data and result folders
 ```{r gse, eval=T, echo=T, message=F, warning=F}
-datadir = "/home/diwadkar/demo/data/"
-resdir = "/home/diwadkar/demo/results/"
+datadir = "data_dir"
+resdir = "res_dir"
 geo_id = "demo"
 geo_fn = paste0(geo_id,"_series_matrix.txt.gz")
 gse <- getGEO(filename=paste0(datadir,geo_fn),GSEMatrix = TRUE)
@@ -185,6 +151,10 @@ pheno_file = geo_dir + "/" + geo_id + "_analysis.Rmd"
 #For OS X add '' -e after -i
 cmd = "sed -i 's/demo/%s/g' %s"%(geo_id,pheno_file)
 
+#Change paths in RMD file
+dat_cmd = "sed -i 's/datadir/%s/g' %s"%(data_dir,pheno_file)
+res_cmd = "sed -i 's/resdir/%s/g' %s"%(res_dir,pheno_file)
+
 
 #Make RMD markdown file - ERROR
 RMDcall = '''
@@ -192,7 +162,7 @@ RMDcall = '''
 #BSUB -L /bin/bash
 #BSUB -J get_sra
 #BSUB -q normal
-#BSUB -outdir /gpfs/fs02/home/diwadkar/GSE95632
+#BSUB -outdir %s
 #BSUB -o get_sra_%sJ.out
 #BSUB -e get_sra_%sJ.screen
 #BSUB -M 36000
@@ -201,7 +171,7 @@ RMDcall = '''
 
 echo "library(rmarkdown); rmarkdown::render('"%s"')" | R --no-save --no-restore
 
-'''%("%","%",pheno_file)
+'''%(geo_dir,"%","%",pheno_file)
 
 
  
@@ -220,22 +190,20 @@ echo "library(rmarkdown); rmarkdown::render('"%s"')" | R --no-save --no-restore
 
 	#Write phenotype RMD file
 	write_in_file(pheno_file,Rcall)
-	print("Analysis phenotype RMD file prepared")
+	print("Phenotype and analysis RMD file prepared")
 
 	#Change demo to GEO ID in phenotype RMD file
 	subprocess.call(cmd,shell=True)
 	print("Demo changed to GEO ID entered in RMD file")
 
+	#Change data and result dir paths in the phenotype RMD file
+	subprocess.call(dat_cmd,shell=True)
+	subprocess.call(res_cmd,shell=True)
+	print("Data and Result directory path changes in RMD file")
+
 	#Prepare lsf file for rmarkdown of phenotype file
 	write_in_file("get_sra.lsf",RMDcall)
-
-	#run_cmd = "bsub < get_sra.lsf"
-
-	#subprocess.call(run_cmd, shell=True)
-	print("Get_sra file prepared")
-
-	#cmd1 = "Rscript -e 'library(rmarkdown); rmarkdown::render(" + '"' +pheno_file+ '"' + ")'"
-	#subprocess.call(cmd1,shell=True)
+	print("get_sra file prepared")
 
 
 

@@ -5,7 +5,7 @@ Reproducible ChIP-Seq analysis pipeline.
 
 Authors: Avantika Diwadkar, Mengyuan Kan, Blanca Himes.
 
-### Introduction
+## Introduction
 
 brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdown files in a HPC environment. It incorporates several publicly available informatics tools to perform a chunk of its analysis. The pipeline consists of the following steps:
 
@@ -19,7 +19,7 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
 * Bigwig files for visualization on UCSC Browser
 
 
-### Bioinformatics Tools
+## Bioinformatics Tools
 * Download of raw files: SRAdb R package which uses a SQLite database connection to download the fastq files.
 * Alignment and QC: FastQC, bwa, samtools.
 * Peak Calling: macs2
@@ -29,10 +29,10 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
 * R packages: plyr, dplyr, pander, DT, ggplots2 are some packages used for data wrangling and visualization.
 
 
-### Data Analysis Workflow
+## Data Analysis Workflow
 
-## Download Data
-* SRADownload.py script can be used to download the data and generate a phenotype file of the samples in the dataset. On running the file, you will be asked to input the GEO ID of the dataset you want to analyze. The script will then download the matrix phenotype file for the dataset using GEOquery, aquire the SRR numbers and download the data using the SRAdb R package.
+### Download Data
+* SRADownload.py script can be used to download the data and generate a phenotype file of the samples in the dataset. On running the file, you will be asked to input the GEO ID of the dataset you want to analyze. The script will then download the matrix phenotype file for the dataset using GEOquery, aquire the SRR numbers and download the data using the SRAdb R package. You can check the phenotype information in GEOID_Phenotype_withoutQC.txt file and check analysis outcome in html file generated. 
 
   Commands:
   > python SRADownload.py #Enter GEO ID when prompted 
@@ -43,5 +43,8 @@ brocade is a pipeline to analyze ChIP-seq data using Python scripts and Rmarkdow
   1) GEOID_analysis.Rmd 
   2) get_sra.lsf
   3) GEOID_analysis.Rmd
+  4) GEOID_Phenotype_withoutQC.txt
+
+* 
 
 

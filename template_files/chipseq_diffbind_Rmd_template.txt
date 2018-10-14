@@ -1,0 +1,414 @@
+### Samples in this comparison
+
+Prepare diffbind csv input file
+
+```{r, eval=T, echo=F, message=F, warning=F, results="asis"}
+#conditions from file - select the portion of the info sheet relevant to the two conditions being tested
+coldata_curr <- coldata[which(coldata$Status==cond1 | coldata$Status==cond0),]
+#modify to diffbind input format
+library(dplyr)
+input_csv <- coldata_curr %>%
+  dplyr::mutate(SampleID=Sample, Factor=Antibody, ControlID=Input, PeakCaller="bed") %>%
+  dplyr::mutate(Condition=ifelse(Status==cond1,"cond1","cond0")) %>%
+  dplyr::group_by(Treatment) %>%
+  dplyr::mutate(Replicate=1:length(Treatment)) %>%
+  dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl, Peaks, PeakCaller) %>%
+  as.data.frame()
+detach("package:dplyr")
+write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"))
+DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
+```
+
+```{r, eval=T, echo=F}
+# assign colours to comparison status
+colour_status <- c("navy","red")
+names(colour_status) <- c(cond0,cond1) # assign red to case and navy to control
+colour_status_list <- unlist(lapply(coldata_curr$Status,function(x){colour_status[x]}))
+colours=c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", "#A6761D", "#666666", "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5", "#FFED6F") # first 8 colour names derived from Dark2, and last 12 names from Set3
+```
+
+#### Major steps
+
+1. Perform differential binding site analysis.
+
+```{r, eval=T, echo=F, message=F, warning=F, results="hide"}
+dat.bind <- dba(sampleSheet=paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"))
+# minimum number of replicates
+nrep=min(table(input_csv$Condition))
+# obtain consensus peaks based on condition
+consensusObj=dba.peakset(dat.bind, consensus=DBA_CONDITION, minOverlap=nrep)
+# If you only want metadata columns for the consensus peaksets without the original peaksets
+consensusObj <- dba(consensusObj, mask=consensusObj$masks$Consensus)
+# retrieve consensus peaks
+dat.peaks=dba.peakset(consensusObj, bRetrieve=TRUE)
+# obtain counts by passing consensus peaks to dba.count()
+dat.bind <- dba.count(dat.bind, peaks=dat.peaks) # this step takes a while
+# create contrast matrix
+dat.bind <- dba.contrast(dat.bind, group1=dat.bind$masks$cond1, group2=dat.bind$masks$cond0, name1=cond1, name2=cond0)
+# perform DESeq2 analysis using default settings for consensus peaks.
+dat.bind <- dba.analyze(dat.bind,method = DBA_DESEQ2)
+# get reports
+dat.report <-  dba.report(dat.bind, bCounts=T, bNormalized=T, th=1) # report all results
+```
+
+2. Annotate gene regions to peaks
+
+```{r, eval=T, echo=F, message=F, warning=F, results="hide"}
+# statistics data frame
+dat.stat=as.data.frame(mcols(dat.report)[1:6])
+# count data frame
+dat.count=mcols(dat.report)[-(1:6)]
+# GRanges object
+dat.gr=granges(dat.report)
+# convert GRanges object to data frame
+dat.gr.tb=data.frame(Chr=seqnames(dat.gr),
+  Start=start(dat.gr),
+  End=end(dat.gr))
+# create unique ID for each peak by chr_strat_end
+ID=paste(dat.gr.tb$Chr, dat.gr.tb$Start, dat.gr.tb$End, sep='_')
+# annoate with flanking region
+dat.anno <- annotatePeak(peak=dat.gr, tssRegion = c(-tss_span,tss_span), TxDb = get(txdb), annoDb=annoDb,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
+# create vector with ENTREZID corresponding to gene symbol
+annoDb_symbol=paste0(gsub('.db','',annoDb),'SYMBOL')
+symbol_vec=as.data.frame(get(annoDb_symbol))[,'symbol']
+names(symbol_vec)=as.data.frame(get(annoDb_symbol))[,'gene_id']
+# convert ENTREZID to symbol for flanking genes
+flank_symbol <- unname(sapply(as.data.frame(dat.anno)$flank_geneIds,function(x){
+  if (is.na(x)){symbol='NA'} else{
+    gene_ids=unique(strsplit(x,split=';')[[1]]);
+    symbols=symbol_vec[gene_ids];
+    symbol=paste(unname(symbols),collapse=';')}
+  symbol}))
+# main peak type annotation
+annotation=as.data.frame(dat.anno)$annotation
+anno_type=gsub("\\s*\\([^\\)]+\\)","",annotation)
+# peak type annotation detail
+anno_detail=sapply(annotation,function(x){
+  if (grepl('[\\(\\)]',x)) {anno_detail=gsub("[\\(\\)]", "", regmatches(x, gregexpr("\\(.*?\\)", x)))} else {anno_detail='NA'} # keep contents in bracket
+  anno_detail
+})
+# select useful columns
+dat.anno.tb <- data.frame(
+  Annotation=anno_type,
+  Gene=as.data.frame(dat.anno)$SYMBOL,
+  DistanceToTSS=as.data.frame(dat.anno)$distanceToTSS,
+  Anno_detail=anno_detail,
+  Flank_symbol=flank_symbol)
+# differential analysis results
+res_df=data.frame(dat.gr.tb,dat.stat,dat.anno.tb, ID=ID)
+res_ct_df=data.frame(ID=ID,dat.count)
+res_ct_df <- res_ct_df %>% gather(Sample, count, -ID)
+res_ct_df <- merge(res_ct_df,coldata[which(coldata$Sample%in%res_ct_df$Sample),c("Sample","Status")],by="Sample")
+res_ct_df$Status <- factor(res_ct_df$Status, levels = c(cond0,cond1))
+```
+
+3. Save differential results and count matrix
+```{r, eval=T, echo=F}
+write.csv(res_df[which(res_df$FDR<0.05),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_diffbind_results.csv"),row.names=F)
+sig_ID=res_df[which(res_df$FDR<0.05),"ID"]
+write.csv(res_ct_df[which(res_ct_df$ID%in%sig_ID),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_counts_normalized_by_diffbind.csv"),row.names=F)
+```
+
+### Top 50 differential binding sites by p-value
+
+```{r, eval=T, echo=F}
+#output table for report
+#select top 50 by pvalue
+res_df_outp <- head(res_df[order(res_df$p.value, decreasing=FALSE),c("Chr","Start","End","Conc","Fold","p.value","FDR","Annotation","Gene")], 50)
+DT::datatable(res_df_outp, rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
+```
+
+### Description of annotated DiffBind output 
+
+Table above shows the selected columns. Here is the description of the full output:
+
+```{r, eval=T, echo=F}
+# create a list of column description
+detail_list <- list()
+detail_list[["Chr"]] <- "Chromosome of binding site"
+detail_list[["Start"]] <- "Starting base position of binding site"
+detail_list[["End"]] <- "End base position of binding site"
+detail_list[["Conc"]] <- "Concentration - mean (log) reads across all samples in both groups"
+detail_list[["Conc_group1"]] <- "Group 1 Concentration - mean (log) reads across all samples first group"
+detail_list[["Conc_group2"]] <- "Group 2 Concentration - mean (log) reads across all samples in second group"
+detail_list[["Fold"]] <- "Fold difference - mean fold difference of binding affinity of group 1 over group 2 (Conc1 - Conc2)."
+detail_list[["p.value"]] <- "p-value calculation - statistic indicating significance of difference"
+detail_list[["FDR"]] <- "adjusted p-value calculation - p-value subjected to multiple-testing correction"
+detail_list[["Annotation"]] <- "Main type of genomic feature of the peak, including Promoter, 3' UTR, 5' UTR, Intron, Exon, Distal Intergenic, Downstream"
+detail_list[["Gene"]] <- "Gene symbol of the nearest gene"
+detail_list[["DistanceToTSS"]] <- paste0("Distance from peak to gene TSS (+/- ",tss_span, "bp region of the gene")
+detail_list[["Anno_detail"]] <- "Details of the annotated position"
+detail_list[["Flank_symbol"]] <- paste0("Gene symbols of the genes within +/ ",flank_span," bp region of the peak")
+detail_list[["ID"]] <- "Unique ID for the peak with the combination of chromosome, start, and end"
+# output information
+# output information
+info_table <- data.frame(
+  name=names(detail_list),
+  description=sapply(names(detail_list), function(x)detail_list[[x]]))
+row.names(info_table) <- NULL
+colnames(info_table) <- c("Output Column", "Description")
+DT::datatable(info_table, rownames = FALSE, options = list(columnDefs = list(list(className = 'dt-left', targets = "_all"))))
+```
+
+### Volcano plots
+
+Volcano plot (probes with a q-value <0.05 are present in red)
+
+```{r, echo=F}
+# The volplot_func function generates volcano plots
+volplot_func <- function(df,qval_column,title) {
+  # get qvalue column
+  qval <- df[,qval_column]
+  if (all(is.na(qval))) {message("All the p/q-values are missing.")} else {         
+    df <- df[!is.na(qval),] # remove NA values
+    qval <- df[,qval_column]
+    if (min(df[,qval_column])>=0.05) {
+      df$sig <- "black" # assign colors to DE and non-DE genes
+    } else {
+      # assign colors to DE and non-DE genes
+      df$sig <- rep(NA,nrow(df))
+      df$sig[qval<0.05] <- "red"
+      df$sig[qval>=0.05] <- "black"
+    }
+    df$sig <- as.factor(df$sig)
+    color <- levels(df$sig)
+    # log10 transformed q values
+    df$logqval <- -log10(qval)
+    diffgenes <- df$Gene[qval<0.05] #Create list of all DEG's
+    signum = paste0(length(diffgenes), " significant binding sites")
+    if (missing(title)) {title=signum}
+    print(
+    ggplot(df, aes(x = Fold, y = logqval, color=sig)) + geom_point() +
+      theme_bw() +
+      labs(title=title,x="log2FoldChange",y=paste0("-log10(",qval_column,")")) +
+      scale_color_manual(values=color) +
+      theme(legend.position="none")
+    )
+  }
+}
+```
+
+```{r, eval=T, echo=F, fig.height=4, fig.width=4}
+for (qval in c("p.value","FDR")) {volplot_func(df=res_df, qval_column=qval)}
+```
+
+
+### MA plot
+
+```{r, eval=T, echo=F}
+dba.plotMA(dat.bind)
+```
+
+
+### Dendrogram based on regularized log transformed data
+
+```{r, echo=F}
+# The dist2 estimates distance between samples
+dist2 <- function (x,fun = function(a, b) mean(abs(a - b), na.rm = TRUE),diagonal = 0) {
+  if (!(is.numeric(diagonal) && (length(diagonal) == 1)))
+    stop("'diagonal' must be a numeric scalar.")
+
+  if (missing(fun)) {
+    res = apply(x, 2, function(w) colMeans(abs(x-w), na.rm=TRUE))
+  } else {
+    res = matrix(diagonal, ncol = ncol(x), nrow = ncol(x))
+    if (ncol(x) >= 2) {
+      for (j in 2:ncol(x))
+        for (i in 1:(j - 1))
+          res[i, j] = res[j, i] = fun(x[, i], x[, j])
+    } # if
+  } # else
+  colnames(res) = rownames(res) = colnames(x)
+  return(res)
+}
+
+distplot_func <- function(m) {
+  dend = as.dendrogram(hclust(as.dist(m), method = "single"))
+  ord = order.dendrogram(dend)
+  array_name=colnames(m)
+  heatmap.2(m,Rowv=dend,Colv=dend,
+    col=viridis(256, option="B"),ColSideColors=colour_status_list,RowSideColors=colour_status_list,
+    labCol=array_name,labRow=array_name,
+    trace="none",
+    margins=c(12,20), # (bottom margin, left margin)
+    cexRow = 1,cexCol = 1,
+    keysize=1.5,key.title=NA,key.xlab="Dist2",key.ylab="Counts")
+  legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.6)
+}
+```
+
+```{r, eval=T, echo=F, fig.height=8, fig.width=10}
+distplot_func(m=dist2(as.matrix(dba.peakset(dat.bind, bRetrieve=T, DataType=DBA_DATA_FRAME)[-c(1:3)])))
+```
+
+### Heatmaps for 30 genes with highest counts
+
+Binding sites were ranked by adjusted p-values.
+
+```{r, echo=F}
+# The heatmap_topgene_func function for top gene heatmap plots
+heatmap_topgene_func <- function(tb, topnum=30, main="") {
+  m=dba.peakset(dat.bind, bRetrieve=T, DataType=DBA_DATA_FRAME)
+  rownames(m)=paste(m$CHR,m$START,m$END,sep='_')
+  top.mat <- log2(m[rownames(m)%in%tb[1:topnum,"ID"],-c(1:3)]) # plot heatmap for top genes
+  array_name <- colnames(top.mat)
+  gene_symbol=tb[1:topnum,"Gene"]
+  heatmap.2(as.matrix(na.omit(top.mat)), col=viridis(256, option="B"),
+    ColSideColors=colour_status_list, # use predefined colour_status_list, assign colors to status
+    labCol=array_name, labRow=gene_symbol, # take out gene probe id
+    trace="none",
+    margins=c(12,20), # (bottom margin, left margin)
+    cexRow=1,cexCol=1,
+    keysize=1.5,key.title=NA,key.xlab="Log2 normalized reads",key.ylab="Counts",
+    main=main)
+  legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.6) # use predifined colour_status
+}
+```
+
+```{r , eval=T, echo=F, fig.height=8, fig.width=10}
+heatmap_topgene_func(tb=res_df, topnum=30, main="")
+```
+
+### Principal Component Analysis (PCA) Plot
+
+```{r, echo=F, warning=F, message=F}
+# The pcastat_func function computes principal components
+pcastat_func <- function(m) {
+  # calculate the variance for each gene
+  rv <- rowVars(m)
+  # obtain original expression data
+  raw.data.pca <- na.omit(apply(m,2,function(x)replace(x,is.infinite(x),NA))) # replace infinite values to NAs and omit NAs
+  # As scale function divides by the variance, the probe with the expression sd=0 across samples must be removed.
+  sd <- apply(raw.data.pca,1,sd)
+  raw.data.pca <- raw.data.pca[!sd==0,]
+  # compute pcs. Rory Stark: DiffBind doesn't transpose the matrix.
+  #pca <- prcomp(t(raw.data.pca), retx = TRUE, center = TRUE, scale = TRUE)
+  pca <- prcomp(raw.data.pca, retx = TRUE, center = TRUE, scale = FALSE)
+  pc <- data.frame(pca$rotation)
+  # compute variance explained by each PC
+  vars <- pca$sdev^2
+  pcs <- t(pc)
+  pvars <- vars*100.0/sum(vars) # proportion of variance (%) explained by each PC
+  cumsum_pvars <- cumsum(pvars) # Cumulative Proportion of Variance (%)
+  if (nrow(pcs)>10) {nres <- 10} else {nres=nrow(pcs)} # select top 10 PCs if number of PCs >10
+  res <- data.frame(rownames(pcs),pvars,cumsum_pvars)[1:nres,]
+  names(res) <- c("PC","Proportion of Variance (%)","Cumulative Proportion of Variance (%)")
+  return(list(tb=res,pc=pc))
+}
+
+# The pcaplot_func creates plots for pc1 and pc2
+pcaplot_func <- function(pc, group_var) { # group_var: column name for a specific group
+  df <- data.frame(
+    PC1=pc$PC1,
+    PC2=pc$PC2,
+    group=coldata_curr[,group_var]
+  )
+  ggplot(df,aes(PC1,PC2,color=group)) + geom_point() + theme_bw()
+}
+
+# The pca_func function generates multiple pca plots for scan date, disease, treatment, and Donor
+pca_func <- function(pc) {
+  group_vars=c("Tissue", "Donor")
+  idx_exist=c(1:length(group_vars))[group_vars%in%names(coldata_curr)] # obtain index of existing variables
+  plot_list=list() # store plots in a list
+  for (i in idx_exist) {
+    group_var=group_vars[i]
+    nlevel=nlevels(coldata_curr[,group_var]) # levels of the variable
+    if (group_var=="ScanDate_Group"|(nlevel>=2&nlevel<=20)) {
+      plot_list[[group_var]]=pcaplot_func(pc, group_var=group_var)+scale_color_hue(name=group_var)
+    }
+  }
+  return(plot_list)
+}
+```
+
+Compute PCs and variance explained by the first 10 PCs
+
+```{r, eval=T, echo=F, warning=F, message=F, results="asis"}
+res_pca <- pcastat_func(m=as.matrix(dba.peakset(dat.bind, bRetrieve=T, DataType=DBA_DATA_FRAME)[-c(1:3)]))
+pandoc.table(res_pca$tb, split.tables=Inf, caption="Variance explained")
+```
+
+PCA plots are generated using the first two principle components colored by known factors (e.g. Status, Tissue, or Donor)
+
+```{r, eval=T, echo=F, message=F, warning=F}
+pcaplot_func(pc=res_pca$pc,group_var="Status")+scale_color_manual("Status",values=colour_status,na.value="grey")
+```
+
+### Boxplots for top 20 differentially binding sites
+
+Binding sites were ranked by pvalue. Counts have been normalized by sequencing depth. Apply log2-transformed values from plotting.
+
+```{r, echo=F}
+boxplot_func <- function(df) {
+    gene_symbol=unique(df$Gene)
+    gene_id=unique(df$ID)
+    ggplot(df, aes(x = Status, y = log2(count), fill=Status)) +
+    geom_boxplot(outlier.colour=NA, lwd=0.2, color="grey18") + 
+    stat_boxplot(geom ='errorbar', color="grey18") + 
+    expand_limits(y=0) +
+    geom_jitter(size=2, width=0.2) + 
+    guides(fill=FALSE) +
+    theme_bw() +  
+    labs(title=paste0(gene_id, " ", gene_symbol)) +
+    #labs(x="condition") +
+    labs(y="Log2 Normalized counts") +
+    theme(text = element_text(size=9), 
+          strip.text.x = element_text(size = 10),
+	  axis.text.x = element_text(size=12),
+          #axis.text.x = element_text(angle = 90, hjust = 1, size=12),
+          axis.text.y = element_text(size=9),
+          plot.title = element_text(size=12),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(size=12))
+}
+```
+
+
+```{r, eval=T, echo=F, message=F, cache=F, warning=F, fig.height=4, fig.width=4}
+topnum=20
+for (i in 1:topnum) {
+  gene_id <- res_df[i,"ID"]
+  gene_symbol <- res_df[i,"Gene"]
+  curr_data <- res_ct_df[which(res_ct_df$ID==gene_id),]
+  curr_data$Gene <- gene_symbol
+  print(boxplot_func(df=curr_data)+scale_fill_manual(values=colour_status,na.value="grey"))
+}
+```
+
+### Profile of ChIP peaks binding to TSS regions
+
+Heatmap of ChIP binding to TSS regions (left).
+
+Average Profile of ChIP peaks binding to TSS region (right).
+
+```{r, eval=T, echo=F, message=F, warning=F, results="hide", fig.height=4, fig.width=4}
+peakHeatmap(dat.gr, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene,upstream=tss_span, downstream=tss_span)
+plotAvgProf2(dat.gr, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, upstream=tss_span, downstream=tss_span)
+```
+
+### Peaks genomic annotation distribution
+
+```{r eval=T, echo=F}
+features=c("Promoter (<=1kb)", "Promoter (1-2kb)", "Promoter (2-3kb)", "5' UTR", "3' UTR", "1st Exon", "Other Exon", "1st Intron", "Other Intron", "Downstream (<=3kb)", "Distal Intergenic")
+anno_dummies=LETTERS[seq(features)]
+anno_cols=c("#1B9E77","#66A61E","#B3DE69","#80B1D3","#8DD3C7","#7570B3","#BC80BD","#FB8072","#FFED6F","#E7298A", "#FCCDE5")
+names(anno_cols) <- features
+names(anno_dummies) <- features
+anno.df=dat.anno@annoStat
+# add dummy
+anno.df.dummy=data.frame(Dummy=sapply(as.character(anno.df$Feature),function(x){anno_dummies[x]}),anno.df)
+anno.df.dummy=anno.df.dummy[order(anno.df.dummy$Dummy),]
+labels=paste(anno.df.dummy$Feature," (",round(anno.df.dummy$Frequency/sum(anno.df.dummy$Frequency)*100, 2),"%)", sep="")
+par(mai = c(0,0,0,0))
+layout(matrix(c(1,2), ncol=2), widths=c(0.6,0.4))
+pie(anno.df.dummy$Frequency,labels=NA,col=anno_cols)
+plot.new()
+legend("center",legend = labels,fill=anno_cols, bty="n")
+```
+
+### Distribution of TF-binding loci relative to TSS
+```{r, eval=T, echo=F, message=F, warning=F, fig.height=2}
+plotDistToTSS(dat.anno)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
+```
+

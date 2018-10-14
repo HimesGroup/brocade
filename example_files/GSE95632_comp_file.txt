@@ -1,0 +1,3 @@
+Condition1	Condition0	Design
+GR_dex	GR_EtOH	unpaired
+RNAP2_dex	RNAP2_EtOH	unpaired

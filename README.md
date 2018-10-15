@@ -7,7 +7,7 @@ Authors: Mengyuan Kan, Avantika Diwadkar, Blanca Himes
 
 ## Overview
 
-The goal of [brocade pipeline|@https://github.com/HimesGroup/brocade@] is to preform reproducible analysis of ChIP-Seq data:
+The goal of [brocade pipeline](https://github.com/HimesGroup/brocade) is to preform reproducible analysis of ChIP-Seq data:
 
 * Download SRA .fastq data and prepare phenotype file
 * Align reads to a reference genome
@@ -27,7 +27,7 @@ Automatically generate LSF scripts in each step for HPC use.
 * **Differential binding analysis:** DiffBind
 * **Peak genomic feature annotation:** Corresponding R genome database packages and ChIPseeker
 * **Pipeline scripts:** the Python scripts make use of various modules including subprocess, os, argparse, sys
-**R markdown scripts for summary reporot:** Require various R libraries such as DT, gplots, ggplot2, rmarkdown, RColorBrewer, dplyr. Note that the current RMD scripts require pandoc version 1.12.3 or higher to generate HTML report.
+* **R markdown scripts for summary reporot:** Require various R libraries such as DT, gplots, ggplot2, rmarkdown, RColorBrewer, dplyr. Note that the current RMD scripts require pandoc version 1.12.3 or higher to generate HTML report.
 
 ## Prerequisite Files
 

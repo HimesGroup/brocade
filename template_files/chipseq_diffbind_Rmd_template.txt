@@ -15,7 +15,7 @@ input_csv <- coldata_curr %>%
   dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl, Peaks, PeakCaller) %>%
   as.data.frame()
 detach("package:dplyr")
-write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"))
+write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"),row.names=F)
 DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
 ```
 

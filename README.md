@@ -86,9 +86,11 @@ The sample info file used in the following steps should be provided by users.
 * 'Peak' column specify 'narrow' or 'broad' peak type
 * 'R1' and/or 'R2' columns containing full paths of .fastq files
 
+For DNA intput controls, specify Antibody=‘Input’, Input=‘NA’, and Peak=‘NA’
+
 **Other columns:**
 
-'Disease', 'Donor' (i.e. cell line ID if <i>in vitro</i> treatment is used), 'Tissue', 'protocol' designating sample preparation kit information.
+'Disease', 'Donor' (i.e. cell line ID if the same donor underwent treated vs. untreated comparison), and 'protocol' designating sample preparation kit information.
 
 **'Index' column** contains index sequence for each sample. If provided, trim raw .fastq files based on corresponding adapter sequences.
 
@@ -132,8 +134,6 @@ The list is based on the following resources:
 
 If users provide new sequences, add the new index type in the 1st column 'Type' and specify it in "--index\_type".
 
-The "--strand" option refers to sequencing that captures both strands (nonstrand) or the 1st synthesized strand (reverse) or the 2nd synthesized strand (forward) of cDNA. If the 2nd strand is synthesized using dUTP, this strand will extinct during PCA amplification, thus only 1st (reverse) strand will be sequenced.
-
 Read sample preparation protocal carefully. Reads not in the specified strand will be discarded. Double check proprotion of reads mapped to no feature category in QC report. If a lot of reads are mapped to 'no feature', the strand option setting is likely incorrect.
 
 **Output files:**
@@ -147,20 +147,23 @@ Various output files will be written for each sample in directories structured a
 > <i>path_start</i>/<i>sample_name</i>/<i>sample_name</i>_ReadCount <br>
 > <i>path_start</i>/<i>sample_name</i>/bwa\_out <br>
 
-2) Run **pipeline_scripts/chipseq\_align\_and\_qc\_report.py** to call peaks.
+2) Run **pipeline_scripts/chipseq_peakcaller.py** to call peaks.
 
 > chipseq\_peakcaller.py --project\_name <i>output_prefix</i> --samples\_in <i>output_prefix</i> --ref\_genome hg38 --path\_start <i>output_path</i> --template\_dir <i>templete_file_directory</i>
 
-> for i in *macs2.lsf; do bsub < $i; done
+> for i in *_macs2.lsf; do bsub < $i; done
 
-Filtering out peaks within 'blacklist regions'. Blacklist regions for hg38 and hg19 are provided in **templete_files**: **hg19_blacklist.bed** and **hg38_blacklist.bed**.
+Whether to perform narrow or broad peak calling was specified in Peak column of sample info file. Generally apply narrow peak calling for transcription binding site. Encode provides narrow or broad marks for histone modifications [here](https://www.encodeproject.org/chip-seq/histone) in the Target-specific Standards section.
+
+
+Filtering out peaks within 'blacklist regions'. Blacklist regions for hg38 and hg19 are provided in **templete_files**: **hg19\_blacklist.bed** and **hg38\_blacklist.bed**.
 
 **Output files:**
 
-Peak files will be written for each sample that underwent ChIPSeq in the macs2 output directory:
+Peak files will be written for samples that underwent ChIPSeq in the macs2 output directory:
 > <i>path_start</i>/<i>sample_name</i>/macs2\_out <br>
 
-3) Run **pipeline_scripts/chipseq\_align\_and\_qc\_report.py** to create an HTML report of QC and alignment summary statistics for ChIP-Seq samples. Read in **template\_files/chipseq\_align\_and\_qc\_report\_Rmd\_template.txt** from specified directory <i>template_dir</i> to create a RMD script.
+3) Run **pipeline\_scripts/chipseq\_align\_and\_qc\_report.py** to create an HTML report of QC and alignment summary statistics for ChIP-Seq samples. Read in **template\_files/chipseq\_align\_and\_qc\_report\_Rmd\_template.txt** from specified directory <i>template_dir</i> to create a RMD script.
 
 > chipseq\_align\_and\_qc\_report.py  --project\_name <i>output_prefix</i> --sample\_in <i>sample_info_file.txt</i> --ref_genome hg38 --library_type SE --path\_start <i>output_path</i> --template\_dir <i>templete_file_directory</i>
 
@@ -188,7 +191,7 @@ Run **pipeline\_scripts/chipseq\_diffbind\_report.py** to perform differential b
 
 > bsub < <i>project_name</i>_diffbind.lsf
 
-The "--sample_in" option specifies user provided phenotype file for DE analysis (**example\_files/GSE95632_Phenotype_withQC.txt**). The columns are the same as **example\_files/GSE95632_Phenotype_withoutQC.txt** but with an additional column "QC_Pass" designating samples to be included (QC_Pass=1) or excluded (QC_Pass=0) after QC. This column naming is rigid which will be recoganized in pipeline scripts, but column order can be changed.
+The "--sample_in" option specifies user provided phenotype file for differential binding analysis (**example\_files/GSE95632_Phenotype_withQC.txt**). The columns are the same as **example\_files/GSE95632_Phenotype_withoutQC.txt** but with an additional column "QC_Pass" designating samples to be included (QC_Pass=1) or excluded (QC_Pass=0) after QC. This column naming is rigid which will be recoganized in pipeline scripts, but column order can be changed.
 
 The "--comp" option specifies comparisons of interest in a tab-delimited text file with one comparison per line with three columns (i.e. Condition1, Condition0, Design), designating Condition1 vs. Condition2. The current version of differential analysis does not support paired analysis.
 

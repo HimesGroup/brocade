@@ -31,7 +31,8 @@ Automatically generate LSF scripts in each step for HPC use.
 
 ## Prerequisite Files
 
-* **Spesis-specific genome reference files:** reference genome fasta files (.fa) and corresponding BWA index files.
+* **Spesis-specific genome reference files:** reference genome fasta files (.fa) and corresponding BWA index files for alignment, and chromosome length file for creating bigwig files.
+* **Blacklist region files**: bed files containing "blacklist regions", i.e. uniquely mappable regions are found at specific types of repeats such as centromeres, telomeres and satellite repeats.
 * **Adapter and primer sequences**: a list of adapter and primer sequences is provided in **template_files/adapter_primer_sequences.txt**. For fastqc, replace . For trimming we provide adapter and primer sequences for the following types: Ilumina TruSeq single index, Illumina unique dual (UD) index adpter and PrepX. Users can tailor this file by adding sequences from other protocols.
 
 ## Workflow
@@ -125,6 +126,9 @@ Common index types provided in **template_files/chipseq_adapter_primer_sequences
 * illumina\_ud\_sys2 (Illumina UD indexed for MiniSeq, NextSeq, HiSeq 3000/4000)
 * prepX (PrepX for Apollo 324 NGS Library Prep System)
 
+The "--bam2bw" option refers to enabling the step of generating bigwig (.bw) files and creating a ucsc track annotation file for visualization.
+
+
 **template_files/chipaseq_adapter_primer_sequences.txt** contains four columns (i.e. Type, Index, Description, Sequence). Sequences in the Index column is used to match those in Index column in sample info file. This column naming is rigid.
 
 The list is based on the following resources:
@@ -145,6 +149,7 @@ Various output files will be written for each sample in directories structured a
 > <i>path_start</i>/<i>sample_name</i>/<i>sample_name</i>_R1_Trimmed\_fastqc.zip <br>
 > <i>path_start</i>/<i>sample_name</i>/<i>sample_name</i>_R2_Trimmed\_fastqc.zip <br>
 > <i>path_start</i>/<i>sample_name</i>/<i>sample_name</i>_ReadCount <br>
+> <i>path_start</i>/<i>projectname_name</i>_ucsc_track.txt <br>
 > <i>path_start</i>/<i>sample_name</i>/bwa\_out <br>
 
 2) Run **pipeline_scripts/chipseq_peakcaller.py** to call peaks.

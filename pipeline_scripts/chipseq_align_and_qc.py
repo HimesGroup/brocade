@@ -272,7 +272,27 @@ def bwa_and_bamstat(curr_sample, out_dir, library_type, R1_trim, R2_trim, bwa_in
     #Gather metrics unique to paired-end samples using CollectInsertSizeMetrics
     if library_type in ["PE"]:
 	cmd=cmd+"java -Xmx2g -jar "+picard_dir+"CollectInsertSizeMetrics.jar VALIDATION_STRINGENCY=LENIENT HISTOGRAM_FILE="+curr_sample+".InsertSizeHist.pdf INPUT="+curr_sample+".bam OUTPUT="+curr_sample+".InsertSizeMetrics\n"
-		
+
+    return cmd
+
+def bam2bw_and_track(curr_sample, curr_color, out_dir, template_dir, track_fn, bigdata_path, len_fn):
+    """
+    Convert bam to bw file
+    """
+
+    cmd=""
+    cmd=cmd+"genomeCoverageBed -split -bg -ibam "+curr_sample+".bam -g "+len_fn+" > "+curr_sample+".bdg\n"
+    cmd=cmd+"LC_COLLATE=C sort -k1,1 -k2,2n "+curr_sample+".bdg > "+curr_sample+".sorted.bdg\n"
+    cmd=cmd+"bedGraphToBigWig "+curr_sample+".sorted.bdg "+len_fn+" "+curr_sample+".bw\n"
+
+    """
+    Create UCSC track file
+    """
+
+    outp=open(track_fn, 'a')
+    outp.write("track type=bigWig name="+"\""+curr_sample+"\" color="+curr_color+" gridDefault=on maxHeightPixels=50 visibility=full autoScale=off viewLimits=5:100 description=\""+curr_sample+"\" bigDataUrl="+bigdata_path+curr_sample+".bw\n")
+    outp.close()
+
     return cmd
 
 def lsf_file(job_name, cmd, memory=36000, thread=12):
@@ -294,7 +314,7 @@ def lsf_file(job_name, cmd, memory=36000, thread=12):
     outp.close()
 
 
-def main(sample_info_file, project_name, ref_genome, library_type, index_type, path_start, template_dir):
+def main(sample_info_file, project_name, ref_genome, library_type, index_type, path_start, template_dir, bam2bw):
     """
     Read in phenotype sample info provided by the users and perform the following steps:
     1) Perform adapter trimming - if Illumina indexes are not available in phenotype files
@@ -303,6 +323,8 @@ def main(sample_info_file, project_name, ref_genome, library_type, index_type, p
     4) Run bwa to align reads to reference genome
     5) Obtain various QC metrics on aligned files
     """
+
+    import chipseq_userdefine_variables as userdef # read in user-defined variable python script
 
     ####
     # Set up and check
@@ -359,6 +381,44 @@ def main(sample_info_file, project_name, ref_genome, library_type, index_type, p
         # Obtain dictionary with adapter sequences of corresponding index type
         index_dict=index_check(indexes, index_type, template_dir)
 
+    # If perform bam to bigwig file conversion, create url and colors
+    if bam2bw:
+        # overwrite ucsc track file if it already exists
+        track_fn=path_start+project_name+"_ucsc_track.txt"
+        if os.path.exists(track_fn):
+            print "Warning: ucsc track file already exists: "+track_fn+". Overwrite it."
+            outp=open(track_fn,'w')
+            outp.write("")
+            outp.close()
+
+        # read in url
+        bigdata_url=userdef.bigdata_url
+        bigdata_path=bigdata_url+"/"+project_name+"/"
+        print "Convert .bam files to .bw files. Use user-provided URL: "+bigdata_url
+        print "Need to copy all the generated .bw files under this path: "+bigdata_path
+
+        # obtain genome length file
+        if ref_genome == "hg38":
+    	    len_fn = userdef.hg38_len
+
+        elif ref_genome == "hg19":
+    	    len_fn = userdef.hg19_len
+
+        check_exist(len_fn)
+
+        # create color list for ucsc track display
+        rgb_colors=["27,158,119", "217,95,2", '117,112,179', '231,41,138'] # Dark2 color set
+        if "Treatment" not in info_dict:
+            colors=track_colors[0]*len(sample_names) # use one color for all samples
+        else:
+            treatments=info_dict["Treatment"]
+            treatment_uniq=list(set(treatments))
+            # Assign color to each treatment condition
+            RGBS={}
+            for i in range(len(treatment_uniq)):
+                RGBS[treatment_uniq[i]]=rgb_colors[i]
+            colors=map(lambda x: RGBS[x], treatments)
+
     ####
     # Run by each sample
     ####
@@ -413,6 +473,15 @@ def main(sample_info_file, project_name, ref_genome, library_type, index_type, p
         cmd = cmd + bwa_cmd
 
         ###
+        # Convert bam to bw
+        ###
+
+        if bam2bw:
+            curr_color=colors[i]
+            bam2bw_cmd=bam2bw_and_track(curr_sample, curr_color, out_dir, template_dir, track_fn, bigdata_path, len_fn)
+            cmd=cmd+bam2bw_cmd
+
+        ###
         # Create .lsf files
         ###
         lsf_file(curr_sample+"_align", cmd)
@@ -427,11 +496,12 @@ if __name__ == "__main__":
         "(options: truseq_single_index, illumin_ud_sys1, illumin_ud_sys2 or user specified in the user-defined adapter reference file.)")
     parser.add_argument("--path_start", default="./", type=str, help="Directory path where project-level directories are located and report directory will be written (default=./)")
     parser.add_argument("--template_dir", default="./", type=str, help="directory to put provided or user defined reference index files")
+    parser.add_argument("--bam2bw", action='store_true', help="If specified, generate bigwig files (.bw) and create ucsc track file.")
     args = parser.parse_args()
 
     if args.project_name is None or args.samples_in is None:
         parser.print_help()
         sys.exit()
 
-    main(args.samples_in, args.project_name, args.ref_genome, args.library_type, args.index_type, args.path_start, args.template_dir)
+    main(args.samples_in, args.project_name, args.ref_genome, args.library_type, args.index_type, args.path_start, args.template_dir, args.bam2bw)
 

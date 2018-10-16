@@ -125,6 +125,9 @@ Common index types provided in **template_files/chipseq_adapter_primer_sequences
 * illumina\_ud\_sys2 (Illumina UD indexed for MiniSeq, NextSeq, HiSeq 3000/4000)
 * prepX (PrepX for Apollo 324 NGS Library Prep System)
 
+The "--bam2bw" option refers to enabling the step of generating bigwig (.bw) files and creating a ucsc track annotation file for visualization.
+
+
 **template_files/chipaseq_adapter_primer_sequences.txt** contains four columns (i.e. Type, Index, Description, Sequence). Sequences in the Index column is used to match those in Index column in sample info file. This column naming is rigid.
 
 The list is based on the following resources:
@@ -145,6 +148,7 @@ Various output files will be written for each sample in directories structured a
 > <i>path_start</i>/<i>sample_name</i>/<i>sample_name</i>_R1_Trimmed\_fastqc.zip <br>
 > <i>path_start</i>/<i>sample_name</i>/<i>sample_name</i>_R2_Trimmed\_fastqc.zip <br>
 > <i>path_start</i>/<i>sample_name</i>/<i>sample_name</i>_ReadCount <br>
+> <i>path_start</i>/<i>projectname_name</i>_ucsc_track.txt
 > <i>path_start</i>/<i>sample_name</i>/bwa\_out <br>
 
 2) Run **pipeline_scripts/chipseq_peakcaller.py** to call peaks.

@@ -395,7 +395,7 @@ def main(sample_info_file, project_name, ref_genome, library_type, index_type, p
         bigdata_url=userdef.bigdata_url
         bigdata_path=bigdata_url+"/"+project_name+"/"
         print "Convert .bam files to .bw files. Use user-provided URL: "+bigdata_url
-        print "Need to copy all the generated .bw files under this path: "+bigdata_path
+        print "Need to upload all the generated .bw files to this path: "+bigdata_path
 
         # obtain genome length file
         if ref_genome == "hg38":
@@ -406,18 +406,18 @@ def main(sample_info_file, project_name, ref_genome, library_type, index_type, p
 
         check_exist(len_fn)
 
-        # create color list for ucsc track display
-        rgb_colors=["27,158,119", "217,95,2", '117,112,179', '231,41,138'] # Dark2 color set
+        # create color list for ucsc track display based on treatment condition
+        rgb_colors=["27,158,119", "217,95,2", '117,112,179', '231,41,138', '102,166,30', '230,171,2', '166,118,29', '102,102,102'] # Dark2 color set "#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", "#A6761D", "#666666" convert to RGB (https://www.rapidtables.com/web/color/RGB_Color.html)
         if "Treatment" not in info_dict:
             colors=track_colors[0]*len(sample_names) # use one color for all samples
         else:
-            treatments=info_dict["Treatment"]
-            treatment_uniq=list(set(treatments))
-            # Assign color to each treatment condition
+            conds=info_dict["Treatment"]
+            cond_uniq=list(set(conds))
+            # Assign color to each Status condition
             RGBS={}
-            for i in range(len(treatment_uniq)):
-                RGBS[treatment_uniq[i]]=rgb_colors[i]
-            colors=map(lambda x: RGBS[x], treatments)
+            for i in range(len(cond_uniq)):
+                RGBS[cond_uniq[i]]=rgb_colors[i]
+            colors=map(lambda x: RGBS[x], conds)
 
     ####
     # Run by each sample

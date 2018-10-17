@@ -23,7 +23,7 @@ Automatically generate LSF scripts in each step for HPC use.
 
 * **Alignment:** BWA
 * **Peak Calling:** macs2
-* **QC:** fastqc, trimmomatic, samtools, bamtools, picardtools
+* **QC:** fastqc, trimmomatic, samtools, bamtools, picardtools, bedtools, bedGraphToBigWig
 * **Differential binding analysis:** DiffBind
 * **Peak genomic feature annotation:** Corresponding R genome database packages and ChIPseeker
 * **Pipeline scripts:** the Python scripts make use of various modules including subprocess, os, argparse, sys
@@ -32,7 +32,7 @@ Automatically generate LSF scripts in each step for HPC use.
 ## Prerequisite Files
 
 * **Spesis-specific genome reference files:** reference genome fasta files (.fa) and corresponding BWA index files for alignment, and chromosome length file for creating bigwig files.
-* **Blacklist region files**: bed files containing "blacklist regions", i.e. uniquely mappable regions are found at specific types of repeats such as centromeres, telomeres and satellite repeats.
+* **Blacklisted region files**: bed files containing "blacklisted regions", i.e. uniquely mappable regions are found at specific types of repeats such as centromeres, telomeres and satellite repeats. These lists are downloaded from [Kundaje Lab](http://mitra.stanford.edu/kundaje/akundaje/release/blacklists/), and converted to .bed file format and provided in **template_files/[ref_genome]_blacklist.bed**.
 * **Adapter and primer sequences**: a list of adapter and primer sequences is provided in **template_files/adapter_primer_sequences.txt**. For fastqc, replace . For trimming we provide adapter and primer sequences for the following types: Ilumina TruSeq single index, Illumina unique dual (UD) index adpter and PrepX. Users can tailor this file by adding sequences from other protocols.
 
 ## Workflow
@@ -109,7 +109,7 @@ Edit **pipeline_scripts/chipseq_userdefine_variables.py** with a list user-defin
 
 If perform adapter trimming, read in **template_files/adapter_primer_sequences.txt** from specified directory <i>template_dir</i> used as a reference list of index and primer sequences for various library preparation kits. In this example, a customized adapter file **example_files/adapter_primer_sequences.txt** was used. To replicate this result, save this file **example_files/adapter_primer_sequences.txt** in user-defined <i>templete_file_directory</i>.
 
-> chipseq_align_and_qc.py --project_name <i>output_prefix</i> --samples_in <i>sample_info_file.txt</i> --ref_genome hg38 --library_type SE --index_type GSE95632 --path_start <i>output_path</i> --template\_dir <i>templete_file_directory</i>
+> chipseq_align_and_qc.py --project_name <i>output_prefix</i> --samples_in <i>sample_info_file.txt</i> --ref_genome hg38 --library_type SE --index_type GSE95632 --path_start <i>output_path</i> --template\_dir <i>templete_file_directory</i> --bam2bw
 
 > for i in *align.lsf; do bsub < $i; done
 

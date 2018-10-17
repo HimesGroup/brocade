@@ -395,7 +395,7 @@ def main(sample_info_file, project_name, ref_genome, library_type, index_type, p
         bigdata_url=userdef.bigdata_url
         bigdata_path=bigdata_url+"/"+project_name+"/"
         print "Convert .bam files to .bw files. Use user-provided URL: "+bigdata_url
-        print "Need to copy all the generated .bw files under this path: "+bigdata_path
+        print "Need to upload all the generated .bw files to this path: "+bigdata_path
 
         # obtain genome length file
         if ref_genome == "hg38":

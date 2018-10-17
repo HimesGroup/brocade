@@ -83,11 +83,12 @@ The sample info file used in the following steps should be provided by users.
 * 'Antibody' column containing antibody used for ChIP
 * 'Tissue' column containing tissue used
 * 'Treatment' column containing treatment conditions
+* 'Disease' column containing diseased conditions
 * 'Input' column containing sample ID used for DNA intput control that did not undergo ChIPSeq
-* 'Peak' column specify 'narrow' or 'broad' peak type
+* 'Peak' column specifying 'narrow' or 'broad' peak type. Generally apply narrow peak calling for transcription binding site. Encode provides a list of [narrow and broad marks for histone modifications](https://www.encodeproject.org/chip-seq/histone) (in the Target-specific Standards section).
 * 'R1' and/or 'R2' columns containing full paths of .fastq files
 
-For DNA intput controls, specify Antibody=‘Input’, Input=‘NA’, and Peak=‘NA’
+For DNA intput controls, specify Antibody='Input', Input='NA', and Peak='NA'
 
 **Other columns:**
 
@@ -158,8 +159,7 @@ Various output files will be written for each sample in directories structured a
 
 > for i in *_macs2.lsf; do bsub < $i; done
 
-Whether to perform narrow or broad peak calling was specified in Peak column of sample info file. Generally apply narrow peak calling for transcription binding site. Encode provides narrow or broad marks for histone modifications [here](https://www.encodeproject.org/chip-seq/histone) in the Target-specific Standards section.
-
+To use narrow or broad peak calling was specified in Peak column of sample info file.
 
 Filtering out peaks within 'blacklist regions'. Blacklist regions for hg38 and hg19 are provided in **templete_files**: **hg19\_blacklist.bed** and **hg38\_blacklist.bed**.
 

@@ -462,18 +462,25 @@ for (i in 1:topnum) {
 }
 ```
 
-### Profile of ChIP peaks binding to TSS regions
+### Profile of significant peaks binding to TSS regions
 
 Heatmap of ChIP binding to TSS regions (left).
 
 Average Profile of ChIP peaks binding to TSS region (right).
 
-```{r, eval=T, echo=F, message=F, warning=F, results="hide", fig.height=4, fig.width=4}
-peakHeatmap(dat.gr, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene,upstream=tss_span, downstream=tss_span)
-plotAvgProf2(dat.gr, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, upstream=tss_span, downstream=tss_span)
+```{r, eval=T, echo=F}
+# redo diffbind analysis and annotation only using significant peaks
+dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
+dat.gr.sig=granges(dat.report.sig)
+dat.anno.sig <- annotatePeak(peak=dat.gr.sig, tssRegion = c(-tss_span,tss_span), TxDb = get(txdb), annoDb=annoDb,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
 ```
 
-### Peaks genomic annotation distribution
+```{r, eval=T, echo=F, message=F, warning=F, results="hide", fig.height=4, fig.width=4}
+peakHeatmap(dat.gr.sig, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene,upstream=tss_span, downstream=tss_span)
+plotAvgProf2(dat.gr.sig, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, upstream=tss_span, downstream=tss_span)
+```
+
+### Distribution of significant peaks' genomic annotation
 
 ```{r eval=T, echo=F}
 features=c("Promoter (<=1kb)", "Promoter (1-2kb)", "Promoter (2-3kb)", "5' UTR", "3' UTR", "1st Exon", "Other Exon", "1st Intron", "Other Intron", "Downstream (<=3kb)", "Distal Intergenic")
@@ -481,7 +488,7 @@ anno_dummies=LETTERS[seq(features)]
 anno_cols=c("#1B9E77","#66A61E","#B3DE69","#80B1D3","#8DD3C7","#7570B3","#BC80BD","#FB8072","#FFED6F","#E7298A", "#FCCDE5")
 names(anno_cols) <- features
 names(anno_dummies) <- features
-anno.df=dat.anno@annoStat
+anno.df=dat.anno.sig@annoStat
 # add dummy
 anno.df.dummy=data.frame(Dummy=sapply(as.character(anno.df$Feature),function(x){anno_dummies[x]}),anno.df)
 anno.df.dummy=anno.df.dummy[order(anno.df.dummy$Dummy),]
@@ -495,9 +502,8 @@ legend("center",legend = labels,fill=anno_cols, bty="n")
 
 ### Distribution of TF-binding loci relative to TSS
 ```{r, eval=T, echo=F, message=F, warning=F, fig.height=2}
-plotDistToTSS(dat.anno)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
+plotDistToTSS(dat.anno.sig)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
 ```
-
 
 ## RNAP2_dex vs. RNAP2_EtOH
 
@@ -884,18 +890,25 @@ for (i in 1:topnum) {
 }
 ```
 
-### Profile of ChIP peaks binding to TSS regions
+### Profile of significant peaks binding to TSS regions
 
 Heatmap of ChIP binding to TSS regions (left).
 
 Average Profile of ChIP peaks binding to TSS region (right).
 
-```{r, eval=T, echo=F, message=F, warning=F, results="hide", fig.height=4, fig.width=4}
-peakHeatmap(dat.gr, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene,upstream=tss_span, downstream=tss_span)
-plotAvgProf2(dat.gr, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, upstream=tss_span, downstream=tss_span)
+```{r, eval=T, echo=F}
+# redo diffbind analysis and annotation only using significant peaks
+dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
+dat.gr.sig=granges(dat.report.sig)
+dat.anno.sig <- annotatePeak(peak=dat.gr.sig, tssRegion = c(-tss_span,tss_span), TxDb = get(txdb), annoDb=annoDb,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
 ```
 
-### Peaks genomic annotation distribution
+```{r, eval=T, echo=F, message=F, warning=F, results="hide", fig.height=4, fig.width=4}
+peakHeatmap(dat.gr.sig, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene,upstream=tss_span, downstream=tss_span)
+plotAvgProf2(dat.gr.sig, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, upstream=tss_span, downstream=tss_span)
+```
+
+### Distribution of significant peaks' genomic annotation
 
 ```{r eval=T, echo=F}
 features=c("Promoter (<=1kb)", "Promoter (1-2kb)", "Promoter (2-3kb)", "5' UTR", "3' UTR", "1st Exon", "Other Exon", "1st Intron", "Other Intron", "Downstream (<=3kb)", "Distal Intergenic")
@@ -903,7 +916,7 @@ anno_dummies=LETTERS[seq(features)]
 anno_cols=c("#1B9E77","#66A61E","#B3DE69","#80B1D3","#8DD3C7","#7570B3","#BC80BD","#FB8072","#FFED6F","#E7298A", "#FCCDE5")
 names(anno_cols) <- features
 names(anno_dummies) <- features
-anno.df=dat.anno@annoStat
+anno.df=dat.anno.sig@annoStat
 # add dummy
 anno.df.dummy=data.frame(Dummy=sapply(as.character(anno.df$Feature),function(x){anno_dummies[x]}),anno.df)
 anno.df.dummy=anno.df.dummy[order(anno.df.dummy$Dummy),]
@@ -917,9 +930,8 @@ legend("center",legend = labels,fill=anno_cols, bty="n")
 
 ### Distribution of TF-binding loci relative to TSS
 ```{r, eval=T, echo=F, message=F, warning=F, fig.height=2}
-plotDistToTSS(dat.anno)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
+plotDistToTSS(dat.anno.sig)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
 ```
-
 
 ```{r session_info, eval=T, echo=F}
 pander(sessionInfo())

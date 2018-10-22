@@ -286,7 +286,7 @@ dba.plotMA(dat.bind)
 ```
 
 
-### Dendrogram based on regularized log transformed data
+### Dendrogram based on log2 normalized data
 
 ```{r, echo=F}
 # The dist2 estimates distance between samples
@@ -327,7 +327,7 @@ distplot_func <- function(m) {
 distplot_func(m=dist2(as.matrix(dba.peakset(dat.bind, bRetrieve=T, DataType=DBA_DATA_FRAME)[-c(1:3)])))
 ```
 
-### Heatmaps for 30 genes with highest counts
+### Heatmaps for top 30 significant binding sites
 
 Binding sites were ranked by adjusted p-values.
 
@@ -714,7 +714,7 @@ dba.plotMA(dat.bind)
 ```
 
 
-### Dendrogram based on regularized log transformed data
+### Dendrogram based on log2 normalized data
 
 ```{r, echo=F}
 # The dist2 estimates distance between samples
@@ -755,7 +755,7 @@ distplot_func <- function(m) {
 distplot_func(m=dist2(as.matrix(dba.peakset(dat.bind, bRetrieve=T, DataType=DBA_DATA_FRAME)[-c(1:3)])))
 ```
 
-### Heatmaps for 30 genes with highest counts
+### Heatmaps for top 30 significant binding sites
 
 Binding sites were ranked by adjusted p-values.
 

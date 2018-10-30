@@ -222,10 +222,10 @@ def trim_and_fastqc(curr_sample, curr_index, out_dir, R1, R2, R1_trim, R2_trim):
         cmd=cmd+"fastqc -o "+out_dir+" "+R1_trim+" "+R2_trim+"\n" # since R2 could be "", no harm to add an empty string directly here
         if curr_index=='NA': # use no-trimmed files
             # original fastqc .zip file name
-            R1_org_name=R1_trim.split(".fastq", 1)[0]+"_fastqc.zip"
+            R1_org_name=out_dir+curr_sample+"_fastqc.zip"
             cmd=cmd+"cp "+R1_org_name+" "+R1_fastqc_fn+"\n"
             if R2_trim!="": # if R2 exists
-                R2_org_name=R2_trim.split(".fastq", 1)[0]+"_fastqc.zip"
+                R2_org_name= out_dir+curr_sample+"_fastqc.zip"
                 cmd=cmd+"cp "+R2_org_name+" "+R2_fastqc_fn+"\n"
 
     #Get total number of reads, unique reads, % unique reads from trimmed file(s).

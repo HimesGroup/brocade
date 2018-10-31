@@ -173,8 +173,8 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
         mk_dir1 = 'mkdir '+input_path
         mk_dir2 = mk_dir1+'/bwa_out/'
         input_merge = 'samtools merge ' + input_path+'/bwa_out/'+project_name+"_input.bam "+ ffiles
-	input_cmd = mk_dir1+"\n"+mk_dir2+"\n"+input_merge+"\n"
-	lsf_file("input_bam", input_cmd, memory=36000, thread=1)
+    	input_cmd = mk_dir1+"\n"+mk_dir2+"\n"+input_merge+"\n"
+    	lsf_file("input_bam", input_cmd, memory=36000, thread=1)
 
     # remove NA
     control_idx=filter(lambda x: controls[x] not in 'NA', range(len(sample_names)))

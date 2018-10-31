@@ -193,11 +193,11 @@ mapped.percent.for.plot <- rbind(
   data.frame(
     variable=colnames(bamstats.percent.table),
     value=as.numeric(bamstats.percent.table["Mapped reads",]),
-    Type=rep("Mapped",nrow(bamstats.percent.table))),
+    Type=rep("Mapped",ncol(bamstats.percent.table))),
   data.frame(
     variable=colnames(bamstats.percent.table),
     value=as.numeric(bamstats.percent.table["Unmapped reads",]),
-    Type=rep("Unmapped",nrow(bamstats.percent.table)))
+    Type=rep("Unmapped",ncol(bamstats.percent.table)))
 )
 mapped.percent.for.plot$Type <- factor(mapped.percent.for.plot$Type, levels=c("Unmapped", "Mapped")) # order so mapped reads are at the bottom 
 

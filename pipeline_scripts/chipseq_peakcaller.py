@@ -90,6 +90,21 @@ def blacklist_rm(curr_sample, curr_peak, ref_genome, path_start, template_dir):
     return cmd
  
 
+def merge_input_bam(info_dict,path_start):
+    """
+    Find the input files in the sample info sheet and merge them into one single bam file
+    """
+    input_files = []
+    NA_index = [i for i, x in enumerate(info_dict["Input"]) if x == "NA"]
+    all_files = info_dict["Sample"] #full file name with path
+    for i in NA_index:
+        file = path_start+all_files[i]+"/bwa_out/"+all_files[i]+".bam"
+        input_files.append(file)
+    
+    ffiles = " ".join(str(x) for x in input_files)
+    return ffiles
+
+
 def lsf_file(job_name, cmd, memory=36000, thread=1):
     """
     Creates .lsf files
@@ -109,7 +124,8 @@ def lsf_file(job_name, cmd, memory=36000, thread=1):
     outp.close()
 
 
-def main(sample_info_file, project_name, ref_genome, path_start, template_dir):
+
+def main(sample_info_file, project_name, ref_genome, path_start, template_dir,input_bam):
     """
     Peak calling using macs2
     Remove peaks within blacklisted regions
@@ -149,6 +165,17 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir):
         sys.exit()
 
     controls = info_dict["Input"]
+
+    #Concatenate the input files if input_bam
+    if input_bam:
+        ffiles = merge_input_bam(info_dict,path_start)
+        input_path = path_start+project_name+'_input'
+        mk_dir1 = 'mkdir '+input_path
+        mk_dir2 = mk_dir1+'/bwa_out/'
+        input_merge = 'samtools merge ' + input_path+'/bwa_out/'+project_name+"_input.bam "+ ffiles
+	    input_cmd = mk_dir1+"\n"+mk_dir2+"\n"+input_merge+"\n"
+	    lsf_file("input_bam", input_cmd, memory=36000, thread=1)
+
     # remove NA
     control_idx=filter(lambda x: controls[x] not in 'NA', range(len(sample_names)))
 
@@ -196,11 +223,12 @@ if __name__ == "__main__":
     parser.add_argument("--ref_genome", default="hg38", type=str, help="Specify reference genome to filter out blacklisted regions (options: hg38, hg19, mm38, mm10, rn6)")
     parser.add_argument("--path_start", default="./", type=str, help="Directory path where project-level directories are located and report directory will be written (default=./)")
     parser.add_argument("--template_dir", default="./", type=str, help="directory to put provided or user defined reference index files")
+    parser.add_argument("--input_bam", action='store_true', help="If specified, merges all input bam files into one file.")
     args = parser.parse_args()
 
     if args.project_name is None or args.samples_in is None:
         parser.print_help()
         sys.exit()
 
-    main(args.samples_in, args.project_name, args.ref_genome, args.path_start, args.template_dir)
+    main(args.samples_in, args.project_name, args.ref_genome, args.path_start, args.template_dir,args.input_bam)
 

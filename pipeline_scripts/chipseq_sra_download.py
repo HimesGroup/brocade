@@ -6,7 +6,7 @@ import os
 import sys
 import subprocess
 
-def make_rmd_html(rmd_template, geo_id, project_name, path_start, out_dir, pheno_info, rmd_file):
+def make_rmd_html(rmd_template, geo_id, project_name, path_start, out_dir, pheno_info, rmd_file, sra_id):
     """
     Creates Rmd report. The top of report is below and the rest concatenated from a separate text document (rmd_template).
     Two files generated: 1) geo_id+"_withoutQC.txt" raw phenotype data from GEO (if phenotype_fn is not specified) 2) project_name+"_sraFile.info" list ftp address of sra files
@@ -31,7 +31,11 @@ def make_rmd_html(rmd_template, geo_id, project_name, path_start, out_dir, pheno
     outp.write("project_name <- '" + project_name + "'\n")
     if pheno_info is not None:
         outp.write("pheno_info <- '" + pheno_info + "'\n")
-    outp.write("geo_id <- '" + geo_id + "'\n")
+    if geo_id!= " ":
+        outp.write("geo_id <- '" + geo_id + "'\n")
+    elif sra_id!= " ":
+        outp.write("sra_id <- '" + sra_id + "'\n")
+        
     outp.write("```\n\n")
 
     outp.write("\n")
@@ -110,7 +114,7 @@ def download_fastq(SRA_info, out_dir, path_start, fastqc):
                 lsf_file(sample+"_"+str(i+1)+"_download", download_cmd) # create .lsf files for download and/or fastqc
             
 
-def main(geo_id, path_start, project_name, pheno_info, template_dir, fastqc):
+def main(geo_id, path_start, project_name, pheno_info, template_dir, fastqc,sra_id):
 
     # Set up project and sample output directories
     if path_start == "./":
@@ -140,7 +144,7 @@ def main(geo_id, path_start, project_name, pheno_info, template_dir, fastqc):
 
     # create and run rmd report file to obtain sample infomation file from GEO and SRA
     rmd_file = out_dir + project_name + "_SRAdownload_ChIPSeqReport.Rmd"
-    make_rmd_html(rmd_template, geo_id, project_name, path_start, out_dir, pheno_info, rmd_file)
+    make_rmd_html(rmd_template, geo_id, project_name, path_start, out_dir, pheno_info, rmd_file,sra_id)
     ftpinfo_cmd="echo \"library(rmarkdown); rmarkdown::render('"+rmd_file+"')\" | R --no-save --no-restore"
     subprocess.call(ftpinfo_cmd, shell=True)
 
@@ -156,16 +160,17 @@ def main(geo_id, path_start, project_name, pheno_info, template_dir, fastqc):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Download ChIP-Seq raw reads .fastq files from SRA.")
-    parser.add_argument("--geo_id", type=str, help="GEO accession id")
+    parser.add_argument("--geo_id", default=" ",type=str, help="GEO accession id")
     parser.add_argument("--path_start", default="./", type=str, help="Directory path where project-level directories are located and report directory will be written (default=./)")
     parser.add_argument("--project_name", type=str, help="Name of project that all samples correspond to.")
     parser.add_argument("--pheno_info", help="Use user defined phenotype file to download the .fastq files of corresponding samples from SRA. The name in 'SRA_ID' column should match the sample id in SRA database. If not defined, download samples based on GEO phenotype field 'relation.1'.")
     parser.add_argument("--template_dir", default="./", type=str, help="The template RMD file chipseq_sra_download_Rmd_template.txt is located.")
     parser.add_argument("--fastqc", action='store_true', help="If specified, run fastqc for downloaded raw .fastq files.")
+    parser.add_argument("--sra_id", default = " ",type=str, help="SRP id if GEO entry does not exist")
     args = parser.parse_args()
 
-    if args.geo_id is None or args.project_name is None:
+    if args.geo_id is None and args.sra_id is None:
         parser.print_help()
         sys.exit()
 
-    main(args.geo_id, args.path_start, args.project_name, args.pheno_info, args.template_dir, args.fastqc)
+    main(args.geo_id, args.path_start, args.project_name, args.pheno_info, args.template_dir, args.fastqc, args.sra_id)

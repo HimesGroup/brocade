@@ -1,4 +1,5 @@
 Install the prerequisite R packages if they do not exist
+
 * GEOquery 
 * SRAdb
 * dplyr
@@ -12,7 +13,7 @@ install.packages("dplyr")
 install.packages("pander")
 ```
 
-Load the necessary libraries. Load dplyr packages later since they will mask other functions.
+Load the necessary libraries.
 
 ```{r lib, eval=T, echo=F, message=F, warning=F}
 library(GEOquery)
@@ -22,6 +23,9 @@ library(pander)
 ```
 
 ### Obtain raw GEO phenotype file
+
+
+If GEO ID (geo_id) is specified:
 
 Obtain raw sample information including SRA ID from GEO. If pheno_fn is specified, download samples based on SRA_ID column; otherwise, download samples based on the GEO raw phenotype file.
 
@@ -103,7 +107,7 @@ if (!file.exists("SRAmetadb.sqlite")) {
   sra_con <- dbConnect(SQLite(),dbname="SRAmetadb.sqlite")
 }
 # obtain SRA file information
-if(exists("geo_id")){
+if (exists("geo_id")){
   sraFiles <- do.call(rbind, lapply(files, srainfo_func))
   write.table(sraFiles, paste0(out_dir, project_name, "_sraFile.info"), col.names=T,row.names=F,sep="\t",quote=F )
   
@@ -112,9 +116,14 @@ if(exists("geo_id")){
   sraFiles <- sraFiles %>% select(run,submission,study,sample,experiment,ftp)
   write.table(sraFiles, paste0(out_dir, project_name, "_sraFile.info"), col.names=T,row.names=F,sep="\t",quote=F )
 }
-
 ```
 
+Show first five rows of SRA information
+
+```{r srainfo_show, eval=T, echo=F, message=F, warning=F, results="asis"}
+row.names(sraFiles) <- NULL
+pandoc.table(head(sraFiles,5), justify='left',split.tables=Inf, caption="SRA information")
+```
 
 ```{r sra_download, eval=F, echo=F, message=F, warning=F}
 # Download fastq files, disabled here
@@ -128,6 +137,8 @@ system.time(sapply(files, sradownload_func))
 ```
 
 ### Raw phenotype summary
+
+If GEO ID (geo_id) is specified:
 
 Generated a summary of all the phenotypic variables for overview.
 
@@ -154,7 +165,7 @@ if(exists("geo_id")){
 ### User tailored phenotype file
 
 
-This step is only used for tailoring raw phenotype file from GEO.
+**This step is only used for tailoring raw phenotype file from GEO. This step requires mannual inspection.**
 
 Raw phenotypic variables are not informative (e.g. description,
 characteristics_ch1 and source_name_ch1) and not created in a consice way.
@@ -165,7 +176,6 @@ For DNA intput controls, specify Antibody='Input', Input='NA', and Peak='NA'.
 
 The example codes for this section are based on phenotype data from GSE95632 (SRA study ID: SRP101282).
 
-**This step requires mannual inspection.** 
 
 ```{r pheno, eval=T, echo=F, message=F, warning=F}
 if(exists("geo_id")){

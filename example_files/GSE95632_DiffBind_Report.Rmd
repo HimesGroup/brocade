@@ -26,10 +26,11 @@ Peaks were annotated using corresponding R packages org.Hs.eg.db and TxDb.Hsapie
 
 
 ```{r lib, echo=F, message=F, warning=F}
-annoDb='org.Hs.eg.db'
-txdb='TxDb.Hsapiens.UCSC.hg38.knownGene'
-library(annoDb,character.only = TRUE)
-library(txdb,character.only = TRUE)
+annoDb_name='org.Hs.eg.db'
+txdb_name='TxDb.Hsapiens.UCSC.hg38.knownGene'
+library(annoDb_name,character.only = TRUE)
+library(txdb_name,character.only = TRUE)
+txdb=get(txdb_name)
 library(DiffBind)
 library(ChIPseeker)
 library(tidyr)
@@ -101,7 +102,7 @@ input_csv <- coldata_curr %>%
   dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl, Peaks, PeakCaller) %>%
   as.data.frame()
 detach("package:dplyr")
-write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"))
+write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"),row.names=F)
 DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
 ```
 
@@ -109,7 +110,7 @@ DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(cl
 # assign colours to comparison status
 colour_status <- c("navy","red")
 names(colour_status) <- c(cond0,cond1) # assign red to case and navy to control
-colour_status_list <- unlist(lapply(coldata_curr$Status,function(x){colour_status[x]}))
+colour_status_list <- unlist(lapply(as.character(coldata_curr$Status),function(x){colour_status[x]}))
 colours=c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", "#A6761D", "#666666", "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5", "#FFED6F") # first 8 colour names derived from Dark2, and last 12 names from Set3
 ```
 
@@ -121,20 +122,65 @@ colours=c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", "#A6
 dat.bind <- dba(sampleSheet=paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"))
 # minimum number of replicates
 nrep=min(table(input_csv$Condition))
+```
+
+Check if there are replicates in each condition.
+
+```{r, echo=F}
+cat("nrep=",as.character(nrep),"\n")
+if (nrep>1) {rep=TRUE} else {rep=FALSE}
+```
+
+If there are replicates in each condition, perform following steps:
+```{r, eval=T, echo=F, message=F, warning=F, results="hide"}
 # obtain consensus peaks based on condition
-consensusObj=dba.peakset(dat.bind, consensus=DBA_CONDITION, minOverlap=nrep)
-# If you only want metadata columns for the consensus peaksets without the original peaksets
-consensusObj <- dba(consensusObj, mask=consensusObj$masks$Consensus)
-# retrieve consensus peaks
-dat.peaks=dba.peakset(consensusObj, bRetrieve=TRUE)
-# obtain counts by passing consensus peaks to dba.count()
-dat.bind <- dba.count(dat.bind, peaks=dat.peaks) # this step takes a while
+if (rep) {
+  consensusObj=dba.peakset(dat.bind, consensus=DBA_CONDITION, minOverlap=nrep)
+}
+```
+
+Obtain consensus peaks in each comparison condition
+```{r, eval=T, echo=F, message=F, warning=F}
+if (rep) {consensusObj}
+```
+
+Obtain union peaks from consensus peaks of each condition
+```{r, eval=T, echo=F, message=F, warning=F}
+if (rep) {
+  # retain metadata columns for the consensus peaksets without the original peaksets
+  consensusObj <- dba(consensusObj, mask=consensusObj$masks$Consensus)
+  # obtain union peakset from the consensus peaksets of each condition
+  consensusObj <- dba.peakset(consensusObj, minOverlap=1)
+  consensusObj
+}
+```
+
+Use counts from union peaksets for differential binding analysis
+```{r, eval=T, echo=F, message=F, warning=F}
+if (rep) {
+  # retain union peaksets
+  consensusObj <- dba(consensusObj, mask=consensusObj$masks$`cond0-cond1`)
+  # retrieve consensus peaks
+  dat.peaks=dba.peakset(consensusObj, bRetrieve=TRUE)
+  # obtain counts by passing consensus peaks to dba.count()
+  dat.bind <- dba.count(dat.bind, peaks=dat.peaks) # this step takes a while
+}
+```
+
+If there is no replicate in each condition, use union peaks from two conditions for differential binding analysis. **Without replicates, the significance estimation does not make any sense.**
+```{r, eval=T, echo=F, message=F, warning=F}
+if (!rep) {
+  dat.bind <- dba.count(dat.bind,minOverlap = 1)
+}
+```
+
+```{r, eval=T, echo=F, message=F, warning=F}
 # create contrast matrix
 dat.bind <- dba.contrast(dat.bind, group1=dat.bind$masks$cond1, group2=dat.bind$masks$cond0, name1=cond1, name2=cond0)
 # perform DESeq2 analysis using default settings for consensus peaks.
 dat.bind <- dba.analyze(dat.bind,method = DBA_DESEQ2)
 # get reports
-dat.report <-  dba.report(dat.bind, bCounts=T, bNormalized=T, th=1) # report all results
+dat.report <-  dba.report(dat.bind, bCounts=T, bNormalized=T, th=1) # report all results th=1, default th=0.5
 ```
 
 2. Annotate gene regions to peaks
@@ -153,9 +199,9 @@ dat.gr.tb=data.frame(Chr=seqnames(dat.gr),
 # create unique ID for each peak by chr_strat_end
 ID=paste(dat.gr.tb$Chr, dat.gr.tb$Start, dat.gr.tb$End, sep='_')
 # annoate with flanking region
-dat.anno <- annotatePeak(peak=dat.gr, tssRegion = c(-tss_span,tss_span), TxDb = get(txdb), annoDb=annoDb,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
+dat.anno <- annotatePeak(peak=dat.gr, tssRegion = c(-tss_span,tss_span), TxDb = txdb, annoDb=annoDb_name,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
 # create vector with ENTREZID corresponding to gene symbol
-annoDb_symbol=paste0(gsub('.db','',annoDb),'SYMBOL')
+annoDb_symbol=paste0(gsub('.db','',annoDb_name),'SYMBOL')
 symbol_vec=as.data.frame(get(annoDb_symbol))[,'symbol']
 names(symbol_vec)=as.data.frame(get(annoDb_symbol))[,'gene_id']
 # convert ENTREZID to symbol for flanking genes
@@ -186,21 +232,34 @@ res_ct_df=data.frame(ID=ID,dat.count)
 res_ct_df <- res_ct_df %>% gather(Sample, count, -ID)
 res_ct_df <- merge(res_ct_df,coldata[which(coldata$Sample%in%res_ct_df$Sample),c("Sample","Status")],by="Sample")
 res_ct_df$Status <- factor(res_ct_df$Status, levels = c(cond0,cond1))
+if (!rep) {res_df=res_df[order(abs(res_df$Fold),decreasing=TRUE),]}
 ```
 
-3. Save differential results and count matrix for significant binding sites
+3. Save differential results and count matrix.
+If there are replicates in each condition, only save significant binding sites; otherwise save all binding sites.
+
 ```{r, eval=T, echo=F}
-write.csv(res_df[which(res_df$FDR<0.05),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_diffbind_results.csv"),row.names=F)
-sig_ID=res_df[which(res_df$FDR<0.05),"ID"]
-write.csv(res_ct_df[which(res_ct_df$ID%in%sig_ID),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_counts_normalized_by_diffbind.csv"),row.names=F)
+if (rep) {
+  write.csv(res_df[which(res_df$FDR<0.05),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_diffbind_results.csv"),row.names=F)
+  sig_ID=res_df[which(res_df$FDR<0.05),"ID"]
+  write.csv(res_ct_df[which(res_ct_df$ID%in%sig_ID),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_counts_normalized_by_diffbind.csv"),row.names=F)
+} else {
+  write.csv(res_df[which(res_df$FDR<=1),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_all_diffbind_results.csv"),row.names=F)
+  sig_ID=res_df[which(res_df$FDR<=1),"ID"]
+  write.csv(res_ct_df[which(res_ct_df$ID%in%sig_ID),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_all_counts_normalized_by_diffbind.csv"),row.names=F) 
+}
 ```
 
-### Top 50 differential binding sites by p-value
+### Top 50 differential binding sites
+
+If there are replicates in each condition, order by p-values; otherwise, other by absolute effect size
 
 ```{r, eval=T, echo=F}
 #output table for report
-#select top 50 by pvalue
-res_df_outp <- head(res_df[order(res_df$p.value, decreasing=FALSE),c("Chr","Start","End","Conc","Fold","p.value","FDR","Annotation","Gene")], 50)
+#select top 50 by pvalue/absolute effect size
+if (rep) {
+  res_df_outp <- head(res_df[order(res_df$p.value,decreasing=FALSE),c("Chr","Start","End","Conc","Fold","p.value","FDR","Annotation","Gene")], 50)} else {
+  res_df_outp <- head(res_df[order(abs(res_df$Fold),decreasing=TRUE),c("Chr","Start","End","Conc","Fold","p.value","FDR","Annotation","Gene")], 50)}
 DT::datatable(res_df_outp, rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
 ```
 
@@ -462,22 +521,36 @@ for (i in 1:topnum) {
 }
 ```
 
-### Profile of significant peaks binding to TSS regions
+### Profile of peaks binding to TSS regions
+
+For studies with replicates, if more than 500 significant peaks were identified, only show significant binding peaks; otherwise, show all peaks.
+
+For studies without replicates, show all peaks.
 
 Heatmap of ChIP binding to TSS regions (left).
 
 Average Profile of ChIP peaks binding to TSS region (right).
 
 ```{r, eval=T, echo=F}
-# redo diffbind analysis and annotation only using significant peaks
-dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
-dat.gr.sig=granges(dat.report.sig)
-dat.anno.sig <- annotatePeak(peak=dat.gr.sig, tssRegion = c(-tss_span,tss_span), TxDb = get(txdb), annoDb=annoDb,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
+if (rep) {
+  # redo diffbind analysis and annotation only using significant peaks
+  dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
+  if (length(dat.report)>500) {
+    cat("Use significant binding sites only.\n")
+    dat.gr.sig=granges(dat.report.sig)
+  } else {
+    cat("Use all binding sites because of <500 significant binding sites.\n")
+    dat.gr.sig=granges(dat.report)}
+} else {
+  dat.gr.sig=granges(dat.report)
+  cat("Use all binding sites because of no replicates in each condition.\n")
+}
 ```
 
 ```{r, eval=T, echo=F, message=F, warning=F, results="hide", fig.height=4, fig.width=4}
-peakHeatmap(dat.gr.sig, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene,upstream=tss_span, downstream=tss_span)
-plotAvgProf2(dat.gr.sig, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, upstream=tss_span, downstream=tss_span)
+dat.anno.sig <- annotatePeak(peak=dat.gr.sig, tssRegion = c(-tss_span,tss_span), TxDb = txdb, annoDb=annoDb_name,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
+peakHeatmap(dat.gr.sig, TxDb=txdb, upstream=tss_span, downstream=tss_span)
+plotAvgProf2(dat.gr.sig, TxDb=txdb, upstream=tss_span, downstream=tss_span)
 ```
 
 ### Distribution of significant peaks' genomic annotation
@@ -504,6 +577,7 @@ legend("center",legend = labels,fill=anno_cols, bty="n")
 ```{r, eval=T, echo=F, message=F, warning=F, fig.height=2}
 plotDistToTSS(dat.anno.sig)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
 ```
+
 
 ## RNAP2_dex vs. RNAP2_EtOH
 
@@ -529,7 +603,7 @@ input_csv <- coldata_curr %>%
   dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl, Peaks, PeakCaller) %>%
   as.data.frame()
 detach("package:dplyr")
-write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"))
+write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"),row.names=F)
 DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
 ```
 
@@ -537,7 +611,7 @@ DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(cl
 # assign colours to comparison status
 colour_status <- c("navy","red")
 names(colour_status) <- c(cond0,cond1) # assign red to case and navy to control
-colour_status_list <- unlist(lapply(coldata_curr$Status,function(x){colour_status[x]}))
+colour_status_list <- unlist(lapply(as.character(coldata_curr$Status),function(x){colour_status[x]}))
 colours=c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", "#A6761D", "#666666", "#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5", "#FFED6F") # first 8 colour names derived from Dark2, and last 12 names from Set3
 ```
 
@@ -549,20 +623,65 @@ colours=c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", "#A6
 dat.bind <- dba(sampleSheet=paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"))
 # minimum number of replicates
 nrep=min(table(input_csv$Condition))
+```
+
+Check if there are replicates in each condition.
+
+```{r, echo=F}
+cat("nrep=",as.character(nrep),"\n")
+if (nrep>1) {rep=TRUE} else {rep=FALSE}
+```
+
+If there are replicates in each condition, perform following steps:
+```{r, eval=T, echo=F, message=F, warning=F, results="hide"}
 # obtain consensus peaks based on condition
-consensusObj=dba.peakset(dat.bind, consensus=DBA_CONDITION, minOverlap=nrep)
-# If you only want metadata columns for the consensus peaksets without the original peaksets
-consensusObj <- dba(consensusObj, mask=consensusObj$masks$Consensus)
-# retrieve consensus peaks
-dat.peaks=dba.peakset(consensusObj, bRetrieve=TRUE)
-# obtain counts by passing consensus peaks to dba.count()
-dat.bind <- dba.count(dat.bind, peaks=dat.peaks) # this step takes a while
+if (rep) {
+  consensusObj=dba.peakset(dat.bind, consensus=DBA_CONDITION, minOverlap=nrep)
+}
+```
+
+Obtain consensus peaks in each comparison condition
+```{r, eval=T, echo=F, message=F, warning=F}
+if (rep) {consensusObj}
+```
+
+Obtain union peaks from consensus peaks of each condition
+```{r, eval=T, echo=F, message=F, warning=F}
+if (rep) {
+  # retain metadata columns for the consensus peaksets without the original peaksets
+  consensusObj <- dba(consensusObj, mask=consensusObj$masks$Consensus)
+  # obtain union peakset from the consensus peaksets of each condition
+  consensusObj <- dba.peakset(consensusObj, minOverlap=1)
+  consensusObj
+}
+```
+
+Use counts from union peaksets for differential binding analysis
+```{r, eval=T, echo=F, message=F, warning=F}
+if (rep) {
+  # retain union peaksets
+  consensusObj <- dba(consensusObj, mask=consensusObj$masks$`cond0-cond1`)
+  # retrieve consensus peaks
+  dat.peaks=dba.peakset(consensusObj, bRetrieve=TRUE)
+  # obtain counts by passing consensus peaks to dba.count()
+  dat.bind <- dba.count(dat.bind, peaks=dat.peaks) # this step takes a while
+}
+```
+
+If there is no replicate in each condition, use union peaks from two conditions for differential binding analysis. **Without replicates, the significance estimation does not make any sense.**
+```{r, eval=T, echo=F, message=F, warning=F}
+if (!rep) {
+  dat.bind <- dba.count(dat.bind,minOverlap = 1)
+}
+```
+
+```{r, eval=T, echo=F, message=F, warning=F}
 # create contrast matrix
 dat.bind <- dba.contrast(dat.bind, group1=dat.bind$masks$cond1, group2=dat.bind$masks$cond0, name1=cond1, name2=cond0)
 # perform DESeq2 analysis using default settings for consensus peaks.
 dat.bind <- dba.analyze(dat.bind,method = DBA_DESEQ2)
 # get reports
-dat.report <-  dba.report(dat.bind, bCounts=T, bNormalized=T, th=1) # report all results
+dat.report <-  dba.report(dat.bind, bCounts=T, bNormalized=T, th=1) # report all results th=1, default th=0.5
 ```
 
 2. Annotate gene regions to peaks
@@ -581,9 +700,9 @@ dat.gr.tb=data.frame(Chr=seqnames(dat.gr),
 # create unique ID for each peak by chr_strat_end
 ID=paste(dat.gr.tb$Chr, dat.gr.tb$Start, dat.gr.tb$End, sep='_')
 # annoate with flanking region
-dat.anno <- annotatePeak(peak=dat.gr, tssRegion = c(-tss_span,tss_span), TxDb = get(txdb), annoDb=annoDb,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
+dat.anno <- annotatePeak(peak=dat.gr, tssRegion = c(-tss_span,tss_span), TxDb = txdb, annoDb=annoDb_name,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
 # create vector with ENTREZID corresponding to gene symbol
-annoDb_symbol=paste0(gsub('.db','',annoDb),'SYMBOL')
+annoDb_symbol=paste0(gsub('.db','',annoDb_name),'SYMBOL')
 symbol_vec=as.data.frame(get(annoDb_symbol))[,'symbol']
 names(symbol_vec)=as.data.frame(get(annoDb_symbol))[,'gene_id']
 # convert ENTREZID to symbol for flanking genes
@@ -614,21 +733,34 @@ res_ct_df=data.frame(ID=ID,dat.count)
 res_ct_df <- res_ct_df %>% gather(Sample, count, -ID)
 res_ct_df <- merge(res_ct_df,coldata[which(coldata$Sample%in%res_ct_df$Sample),c("Sample","Status")],by="Sample")
 res_ct_df$Status <- factor(res_ct_df$Status, levels = c(cond0,cond1))
+if (!rep) {res_df=res_df[order(abs(res_df$Fold),decreasing=TRUE),]}
 ```
 
-3. Save differential results and count matrix for significant binding sites
+3. Save differential results and count matrix.
+If there are replicates in each condition, only save significant binding sites; otherwise save all binding sites.
+
 ```{r, eval=T, echo=F}
-write.csv(res_df[which(res_df$FDR<0.05),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_diffbind_results.csv"),row.names=F)
-sig_ID=res_df[which(res_df$FDR<0.05),"ID"]
-write.csv(res_ct_df[which(res_ct_df$ID%in%sig_ID),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_counts_normalized_by_diffbind.csv"),row.names=F)
+if (rep) {
+  write.csv(res_df[which(res_df$FDR<0.05),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_diffbind_results.csv"),row.names=F)
+  sig_ID=res_df[which(res_df$FDR<0.05),"ID"]
+  write.csv(res_ct_df[which(res_ct_df$ID%in%sig_ID),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_sig_counts_normalized_by_diffbind.csv"),row.names=F)
+} else {
+  write.csv(res_df[which(res_df$FDR<=1),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_all_diffbind_results.csv"),row.names=F)
+  sig_ID=res_df[which(res_df$FDR<=1),"ID"]
+  write.csv(res_ct_df[which(res_ct_df$ID%in%sig_ID),],paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_all_counts_normalized_by_diffbind.csv"),row.names=F) 
+}
 ```
 
-### Top 50 differential binding sites by p-value
+### Top 50 differential binding sites
+
+If there are replicates in each condition, order by p-values; otherwise, other by absolute effect size
 
 ```{r, eval=T, echo=F}
 #output table for report
-#select top 50 by pvalue
-res_df_outp <- head(res_df[order(res_df$p.value, decreasing=FALSE),c("Chr","Start","End","Conc","Fold","p.value","FDR","Annotation","Gene")], 50)
+#select top 50 by pvalue/absolute effect size
+if (rep) {
+  res_df_outp <- head(res_df[order(res_df$p.value,decreasing=FALSE),c("Chr","Start","End","Conc","Fold","p.value","FDR","Annotation","Gene")], 50)} else {
+  res_df_outp <- head(res_df[order(abs(res_df$Fold),decreasing=TRUE),c("Chr","Start","End","Conc","Fold","p.value","FDR","Annotation","Gene")], 50)}
 DT::datatable(res_df_outp, rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
 ```
 
@@ -890,22 +1022,36 @@ for (i in 1:topnum) {
 }
 ```
 
-### Profile of significant peaks binding to TSS regions
+### Profile of peaks binding to TSS regions
+
+For studies with replicates, if more than 500 significant peaks were identified, only show significant binding peaks; otherwise, show all peaks.
+
+For studies without replicates, show all peaks.
 
 Heatmap of ChIP binding to TSS regions (left).
 
 Average Profile of ChIP peaks binding to TSS region (right).
 
 ```{r, eval=T, echo=F}
-# redo diffbind analysis and annotation only using significant peaks
-dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
-dat.gr.sig=granges(dat.report.sig)
-dat.anno.sig <- annotatePeak(peak=dat.gr.sig, tssRegion = c(-tss_span,tss_span), TxDb = get(txdb), annoDb=annoDb,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
+if (rep) {
+  # redo diffbind analysis and annotation only using significant peaks
+  dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
+  if (length(dat.report)>500) {
+    cat("Use significant binding sites only.\n")
+    dat.gr.sig=granges(dat.report.sig)
+  } else {
+    cat("Use all binding sites because of <500 significant binding sites.\n")
+    dat.gr.sig=granges(dat.report)}
+} else {
+  dat.gr.sig=granges(dat.report)
+  cat("Use all binding sites because of no replicates in each condition.\n")
+}
 ```
 
 ```{r, eval=T, echo=F, message=F, warning=F, results="hide", fig.height=4, fig.width=4}
-peakHeatmap(dat.gr.sig, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene,upstream=tss_span, downstream=tss_span)
-plotAvgProf2(dat.gr.sig, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, upstream=tss_span, downstream=tss_span)
+dat.anno.sig <- annotatePeak(peak=dat.gr.sig, tssRegion = c(-tss_span,tss_span), TxDb = txdb, annoDb=annoDb_name,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
+peakHeatmap(dat.gr.sig, TxDb=txdb, upstream=tss_span, downstream=tss_span)
+plotAvgProf2(dat.gr.sig, TxDb=txdb, upstream=tss_span, downstream=tss_span)
 ```
 
 ### Distribution of significant peaks' genomic annotation
@@ -932,6 +1078,7 @@ legend("center",legend = labels,fill=anno_cols, bty="n")
 ```{r, eval=T, echo=F, message=F, warning=F, fig.height=2}
 plotDistToTSS(dat.anno.sig)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
 ```
+
 
 ```{r session_info, eval=T, echo=F}
 pander(sessionInfo())

@@ -5,6 +5,11 @@ import subprocess
 import os
 import glob
 
+# import user-defined parameters
+import chipseq_userdefine_variables as userdef # read in user-defined variable python script
+# import HPC parameters
+memory=userdef.memory
+queue=userdef.queue
 
 def check_exist(file):
     if not os.path.exists(file):
@@ -24,7 +29,7 @@ def get_sample_info(fin):
         f.remove('')
     header = f[0].split('\t') # list
     c = f[1:]
- 
+
     # Obtain column index from file header
     if "Sample" not in header:
         print "Sample column is missing. Please check!"
@@ -88,7 +93,7 @@ def blacklist_rm(curr_sample, curr_peak, ref_genome, path_start, template_dir):
 
     cmd=cmd+"\n"
     return cmd
- 
+
 
 def merge_input_bam(info_dict,path_start):
     """
@@ -100,12 +105,12 @@ def merge_input_bam(info_dict,path_start):
     for i in NA_index:
         file = path_start+all_files[i]+"/bwa_out/"+all_files[i]+".bam"
         input_files.append(file)
-    
+
     ffiles = " ".join(str(x) for x in input_files)
     return ffiles
 
 
-def lsf_file(job_name, cmd, memory=36000, thread=1):
+def lsf_file(job_name, cmd, memory=memory, thread=1, queue=queue):
     """
     Creates .lsf files
     """
@@ -114,7 +119,7 @@ def lsf_file(job_name, cmd, memory=36000, thread=1):
     outp.write("#!/bin/bash\n")
     outp.write("#BSUB -L /bin/bash\n")
     outp.write("#BSUB -J "+job_name+"\n")
-    outp.write("#BSUB -q normal\n")
+    outp.write("#BSUB -q "+queue+"\n")
     outp.write("#BSUB -o "+job_name+"_%J.out\n")
     outp.write("#BSUB -e "+job_name+"_%J.screen\n")
     outp.write("#BSUB -M "+str(memory)+"\n")
@@ -122,7 +127,6 @@ def lsf_file(job_name, cmd, memory=36000, thread=1):
     outp.write(cmd)
     outp.write("\n")
     outp.close()
-
 
 
 def main(sample_info_file, project_name, ref_genome, path_start, template_dir,input_bam):
@@ -168,13 +172,14 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
 
     #Concatenate the input files if input_bam
     if input_bam:
+        print "Merging input DNA control .bam files. It will take a while..."
         ffiles = merge_input_bam(info_dict,path_start)
         input_path = path_start+project_name+'_input'
-        mk_dir1 = 'mkdir '+input_path
-        mk_dir2 = mk_dir1+'/bwa_out/'
+        mk_dir = 'mkdir -p '+input_path+'/bwa_out/'
         input_merge = 'samtools merge ' + input_path+'/bwa_out/'+project_name+"_input.bam "+ ffiles
-        input_cmd = mk_dir1+"\n"+mk_dir2+"\n"+input_merge+"\n"
-        lsf_file("input_bam", input_cmd, memory=36000, thread=1)
+        subprocess.Popen(mk_dir,shell=True).wait()
+        subprocess.Popen(input_merge,shell=True).wait()
+        print "Done!"
 
     # remove NA
     control_idx=filter(lambda x: controls[x] not in 'NA', range(len(sample_names)))
@@ -182,7 +187,7 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
     # Obtain peak information
     if "Peak" not in info_dict:
         print "Peak column that specifies narrow or broad peak is missing. Please check!"
-    
+
     peaks = info_dict["Peak"]
     peak_filt=map(lambda x: peaks[x], control_idx)
     if any(map(lambda x:x not in ['narrow','broad'], peak_filt)):
@@ -196,7 +201,7 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
         curr_control=controls[i]
         curr_peak=peaks[i]
         print "treatment and control pair: "+curr_sample+"+"+curr_control
-        
+
         ###
         # Peak calling
         ###
@@ -207,7 +212,7 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
         ###
         # Remove blacklisted regions
         ###
-        
+
         blackrm_cmd=blacklist_rm(curr_sample, curr_peak, ref_genome, path_start, template_dir)
         cmd=cmd+blackrm_cmd
 

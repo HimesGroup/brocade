@@ -6,6 +6,22 @@ import os
 import re
 import fnmatch
 
+# import user-defined parameters
+import chipseq_userdefine_variables as userdef # read in user-defined variable python script
+# import software version
+bwa_version=userdef.bwa_version
+macs2_version=userdef.macs2_version
+diffbind_version=userdef.diffbind_version
+chipseeker_version=userdef.chipseeker_version
+deseq2_version=userdef.deseq2_version
+# import author information
+author=userdef.author
+# import favorite genes
+fav_gene=userdef.fav_gene
+# import HPC parameters
+memory=userdef.memory
+queue=userdef.queue
+
 def make_rmd_css(path_start):
     """
     create custom.css for rmarkdown
@@ -25,7 +41,7 @@ def make_rmd_css(path_start):
     css_outp.close()
 
 
-def lsf_file(job_name, cmd, memory=36000, thread=1):
+def lsf_file(job_name, cmd, memory=memory, thread=1, queue=queue):
     """
     Creates .lsf files
     """
@@ -34,7 +50,7 @@ def lsf_file(job_name, cmd, memory=36000, thread=1):
     outp.write("#!/bin/bash\n")
     outp.write("#BSUB -L /bin/bash\n")
     outp.write("#BSUB -J "+job_name+"\n")
-    outp.write("#BSUB -q normal\n")
+    outp.write("#BSUB -q "+queue+"\n")
     outp.write("#BSUB -o "+job_name+"_%J.out\n")
     outp.write("#BSUB -e "+job_name+"_%J.screen\n")
     outp.write("#BSUB -M "+str(memory)+"\n")
@@ -71,18 +87,6 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
 
     outp = open(out_dir+'/'+project_name+"_DiffBind_Report.Rmd", "w")
 
-    import chipseq_userdefine_variables as userdef # read in user-defined variable python script
-    # import software version
-    bwa_version=userdef.bwa_version
-    macs2_version=userdef.macs2_version
-    diffbind_version=userdef.diffbind_version
-    chipseeker_version=userdef.chipseeker_version
-    deseq2_version=userdef.deseq2_version
-    # import author information
-    author=userdef.author
-    # import favorite genes
-    fav_gene=userdef.fav_gene
-
     # title
     outp.write("---\ntitle: 'Differential Binding Site Results for "+project_name+"'\n")
     outp.write("author: "+author+"\n")
@@ -110,9 +114,10 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
 
     # Load library and set variables
     outp.write("\n\n```{r lib, echo=F, message=F, warning=F}\n")
-    outp.write("annoDb='"+annoDb+"'\n")
-    outp.write("txdb='"+txdb+"'\n")
-    outp.write("library(annoDb,character.only = TRUE)\nlibrary(txdb,character.only = TRUE)\n")
+    outp.write("annoDb_name='"+annoDb+"'\n")
+    outp.write("txdb_name='"+txdb+"'\n")
+    outp.write("library(annoDb_name,character.only = TRUE)\nlibrary(txdb_name,character.only = TRUE)\n")
+    outp.write("txdb=get(txdb_name)\n")
     outp.write("library(DiffBind)\nlibrary(ChIPseeker)\nlibrary(tidyr)\nlibrary(DT)\nlibrary(devtools)\nlibrary(ggplot2)\nlibrary(gplots)\nlibrary(RColorBrewer)\nlibrary(viridis)\nlibrary(pander)\noptions(width = 1000)\n```\n")
     outp.write("\n")
     outp.write("```{r vars, eval=T, echo=F}\n")

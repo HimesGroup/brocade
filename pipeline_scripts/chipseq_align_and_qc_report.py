@@ -5,6 +5,21 @@ import subprocess
 import os
 import re
 
+import chipseq_userdefine_variables as userdef # read in user-defined variable python script
+# import software version
+trimmomatic_version=userdef.trimmomatic_version
+fastqc_version=userdef.fastqc_version
+bwa_version=userdef.bwa_version
+samtools_version=userdef.samtools_version
+bamtools_version=userdef.bamtools_version
+picard_version=userdef.picard_version
+# import author information
+author=userdef.author
+
+# import HPC parameters
+memory=userdef.memory
+queue=userdef.queue
+
 def get_sample_info(fin):
     """
     Read in information from phenotype file
@@ -419,17 +434,6 @@ def make_rmd_title(new_dir, project_name, ref_genome):
     Rmarkdown creation: Create title and major description
     """
 
-    import chipseq_userdefine_variables as userdef # read in user-defined variable python script
-    # import software version
-    trimmomatic_version=userdef.trimmomatic_version
-    fastqc_version=userdef.fastqc_version
-    bwa_version=userdef.bwa_version
-    samtools_version=userdef.samtools_version
-    bamtools_version=userdef.bamtools_version
-    picard_version=userdef.picard_version
-    # import author information
-    author=userdef.author
-
     rmd="---\ntitle: 'ChIP-Seq Report of Sample QC and Alignment Summary Statistics for "+project_name+"'\n"
     rmd=rmd+"author: "+author+"\n"
     rmd=rmd+"date: \"`r format(Sys.time(), '%d %B, %Y')`\"\n"
@@ -501,7 +505,8 @@ def make_rmd_featurestat(project_name):
     rmd=rmd+"```\n\n"
     return rmd
 
-def lsf_file(job_name, cmd, memory=36000, thread=1):
+
+def lsf_file(job_name, cmd, memory=memory, thread=1, queue=queue):
     """
     Creates .lsf files
     """
@@ -510,7 +515,7 @@ def lsf_file(job_name, cmd, memory=36000, thread=1):
     outp.write("#!/bin/bash\n")
     outp.write("#BSUB -L /bin/bash\n")
     outp.write("#BSUB -J "+job_name+"\n")
-    outp.write("#BSUB -q normal\n")
+    outp.write("#BSUB -q "+queue+"\n")
     outp.write("#BSUB -o "+job_name+"_%J.out\n")
     outp.write("#BSUB -e "+job_name+"_%J.screen\n")
     outp.write("#BSUB -M "+str(memory)+"\n")
@@ -518,6 +523,8 @@ def lsf_file(job_name, cmd, memory=36000, thread=1):
     outp.write(cmd)
     outp.write("\n")
     outp.close()
+
+
 
 def make_rmd_html(sample_info_file, project_name, path_start, new_dir, sample_names, ref_genome, library_type, template_dir):
     """

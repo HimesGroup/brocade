@@ -61,6 +61,14 @@ deseq2_version="1.18.1"
 diffbind_version="2.6.6"
 chipseeker_version="1.14.2"
 
+
+###
+# HPC parameters
+###
+
+memory=36000
+queue="legacy" # normal or legacy
+
 ###
 # Genes of interest
 ###

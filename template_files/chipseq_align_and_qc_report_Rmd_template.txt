@@ -366,27 +366,18 @@ input_csv <- coldata %>%
 write.csv(input_csv,paste0(project_name,".sampleinfo.csv"),row.names=F)
 ```
 
-Perform PCA using read scores from DiffBind. DiffBind will compute read counts for all samples. This process takes a while.
+Perform PCA using read scores from DiffBind. DiffBind will compute read counts for all samples. This process takes a while. Use peaks at least shared by two samples.
 
 ```{r diffbind_func, echo=F}
 diffbind_func <- function(){
   dat.bind <- dba(sampleSheet=paste0(project_name,".sampleinfo.csv"))
-  # minimum number of replicates
-  nrep=min(table(input_csv$Condition))
-  # obtain consensus peaks based on condition
-  consensusObj=dba.peakset(dat.bind, consensus=DBA_CONDITION, minOverlap=nrep)
-  # If you only want metadata columns for the consensus peaksets without the original peaksets
-  consensusObj <- dba(consensusObj, mask=consensusObj$masks$Consensus)
-  # retrieve consensus peaks
-  dat.peaks=dba.peakset(consensusObj, bRetrieve=TRUE)
-  # obtain counts by passing consensus peaks to dba.count()
-  dat.bind <- dba.count(dat.bind, peaks=dat.peaks) # this step takes a while
+  # obtain counts of peaks that at least shared by two samples
+  dat.bind <- dba.count(dat.bind, minOverlap=2) # this step takes a while
   # saveRDS(dat.bind, paste0(project_name,"_count.RDS"))
   # retrieve read scores
   dat.scores=dba.peakset(dat.bind, bRetrieve=T, DataType=DBA_DATA_FRAME)[-c(1:3)]
   return(dat.scores)
 }
-
 ```
 
 ```{r diffbind_count, eval=T, echo=F, message=F, warning=F, results="hide"}

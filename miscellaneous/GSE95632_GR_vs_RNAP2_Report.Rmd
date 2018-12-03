@@ -1,0 +1,190 @@
+---
+title: 'Compare GR and RNAP2 Occupancy for GSE95632'
+author: Mengyuan Kan (mengykan@upenn.edu)
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    depth: 3
+editor_options: 
+  chunk_output_type: console
+chunk_output_type: console
+---
+
+Compare differntial binding peaks of GR and RNAP2.
+
+**User-defined variables** for files and paths:
+
+```{r var1, eval=T, echo=T}
+project_name="GSE95632"
+tissue="ASM"
+cond0="EtOH"
+cond1="dex"
+#out_dir="C:/Users/mengykan/Dropbox/UPenn/Research/ChIPSeq/GSE95632/comparisons"
+#GR_peak_fn <- 'C:/Users/mengykan/Dropbox/UPenn/Research/ChIPSeq/GSE95632/GSE95632_diffbind_out/GSE95632_GR_dex_vs_GR_EtOH_sig_diffbind_results.csv'
+#RNAP2_peak_fn <- 'C:/Users/mengykan/Dropbox/UPenn/Research/ChIPSeq/GSE95632/GSE95632_diffbind_out/GSE95632_RNAP2_dex_vs_RNAP2_EtOH_sig_diffbind_results.csv'
+out_dir='/home/mengykan/Projects/GSE95632/comparisons'
+GR_peak_fn <- '/home/mengykan/Projects/GSE95632/GSE95632_diffbind_out/GSE95632_GR_dex_vs_GR_EtOH_sig_diffbind_results.csv'
+RNAP2_peak_fn <- '/home/mengykan/Projects/GSE95632/GSE95632_diffbind_out/GSE95632_RNAP2_dex_vs_RNAP2_EtOH_sig_diffbind_results.csv'
+```
+
+```{r out_fn, eval=T, echo=F}
+out_fn=paste0(out_dir,"/",project_name,"_",tissue,"_",cond1,"_vs_",cond0,".GR_RNAP2.txt")
+cat("Output file:", out_fn, "\n")
+```
+
+**User-defined variables** for annotation libraries:
+
+```{r var2, eval=T, echo=T}
+annoDb_name='EnsDb.Hsapiens.v79'
+txdb_name='TxDb.Hsapiens.UCSC.hg38.knownGene'
+```
+
+**User-defined variables** filterations:
+
+* Fold.GR: include GR peaks with an absolute fold change > Fold.GR
+* Fold.RNAP2: include RNAP2 peaks with an absolute fold change > Fold.RNAP2
+* GENEBIOTYPE: include genes of the following types (antisense, lincRNA, LRG_gene, miRNA, protein_coding, snoRNA, TEC)
+
+```{r var3, eval=T, echo=T}
+GENEBIOTYPE="protein_coding"
+```
+
+
+Load libraries
+
+```{r lib, echo=T, message=F, warning=F}
+library(annoDb_name,character.only = TRUE)
+library(txdb_name,character.only = TRUE)
+library(dplyr)
+library(limma)
+library(ChIPseeker)
+library(ggplot2)
+library(RColorBrewer)
+library(pander)
+options(width = 1000)
+```
+
+
+```{r read_db, eval=T, echo=F}
+txdb <- keepStandardChromosomes(get(txdb_name)) # remove alternative chromosomes
+annoDb <- get(annoDb_name) # annotation database
+```
+
+```{r check_db, eval=F, echo=F}
+keytypes(txdb)
+columns(txdb)
+keytypes(annoDb)
+columns(annoDb)
+```
+
+```{r fav_genes, eval=F, echo=F}
+txdb_gene=genes(get(txdb_name))
+klf15=txdb_gene[which(txdb_gene$gene_id=="28999"),]
+glul=txdb_gene[which(txdb_gene$gene_id=="2752"),]
+mmp19=txdb_gene[which(txdb_gene$gene_id=="4327"),]
+socs3=txdb_gene[which(txdb_gene$gene_id=="9021"),]
+```
+
+
+Define that GR binding regions are located within 10kb upstream and 3kb downstream of the gene transcription start site.
+Define RNA polymerase II binding regions are located within +/- 3kb of the gene transcription start site.
+
+```{r promoter, eval=T, echo=F}
+RNAP2_promoters <- promoters(genes(txdb), upstream=3000, downstream=3000) # default: single strand genes only
+GR_promoters <- promoters(genes(txdb), upstream=10000, downstream=3000)
+```
+
+```{r gene_df, eval=T, echo=F}
+# create data frame for all ENTREZID genes
+genes <- data.frame(genes(txdb)) %>%
+  mutate(TSS=ifelse(strand=="+",start,ifelse(strand=="-",end,"NA"))) %>%
+  mutate(TSS=as.numeric(TSS))
+```
+
+```{r peak, eval=T, echo=F}
+GR_peak <- read.csv(GR_peak_fn)
+GR_gr <- makeGRangesFromDataFrame(GR_peak[,1:3])
+RNAP2_peak <- read.csv(RNAP2_peak_fn)
+RNAP2_gr <- makeGRangesFromDataFrame(RNAP2_peak[,1:3])
+```
+
+```{r overlap_func, echo=F}
+overlap_func <- function(gr1,gr2){
+  overlap_gr <- findOverlaps(gr1, gr2)
+  query_gr <- gr1[queryHits(overlap_gr)]
+  hit_gr <- gr2[subjectHits(overlap_gr)]
+  mcols(query_gr)$gene_id <- hit_gr$gene_id
+  strand(query_gr) <- strand(hit_gr)
+  df=data.frame(query_gr)
+  df$ID=paste(df$seqnames,df$start,df$end,sep="_")
+  return(df)
+}
+```
+
+### Genes with both GR and RNAP2 peaks
+
+```{r overlap, echo=F, message=F, warning=F}
+GR_overlap=overlap_func(gr1=GR_gr,gr2=GR_promoters)
+RNAP2_overlap=overlap_func(gr1=RNAP2_gr,gr2=RNAP2_promoters)
+GR_RNAP2=merge(GR_overlap[,c("gene_id","ID")], RNAP2_overlap[,c("gene_id","ID")], by="gene_id", suffixes=c(".GR",".RNAP2"))
+symbols <- AnnotationDbi::select(annoDb, unique(GR_RNAP2$gene_id), c("ENTREZID","SYMBOL","GENEBIOTYPE"), keytype="ENTREZID")
+# add gene strand and TSS
+symbols <- merge(symbols,genes[,c("gene_id","strand","TSS")],by.x="ENTREZID",by.y="gene_id",all.x=TRUE)
+# merge with peaks
+GR_RNAP2=merge(GR_RNAP2,symbols,by.x="gene_id",by.y="ENTREZID")
+GR_RNAP2=merge(GR_RNAP2,GR_peak[,c("ID","Fold","p.value","FDR")],by.x="ID.GR",by.y="ID",all.x=TRUE)
+names(GR_RNAP2)[which(names(GR_RNAP2)%in%c("Fold","p.value","FDR"))]=paste(c("Fold","p.value","FDR"),"GR",sep=".")
+GR_RNAP2=merge(GR_RNAP2,RNAP2_peak[,c("ID","Fold","p.value","FDR")],by.x="ID.RNAP2",by.y="ID",all.x=TRUE)
+names(GR_RNAP2)[which(names(GR_RNAP2)%in%c("Fold","p.value","FDR"))]=paste(c("Fold","p.value","FDR"),"RNAP2",sep=".")
+colnames <- c("SYMBOL", "gene_id", "GENEBIOTYPE", "strand", "TSS", "ID.GR", "Fold.GR", "p.value.GR", "FDR.GR", "ID.RNAP2", "Fold.RNAP2", "p.value.RNAP2", "FDR.RNAP2")
+GR_RNAP2=GR_RNAP2[,colnames]
+```
+
+```{r sel_func, eval=T, echo=F}
+sel_func <- function(dat,Fold.GR,Fold.RNAP2,GENEBIOTYPE) {
+  if (!missing(Fold.GR)) {dat <- dat[which(abs(dat$Fold.GR)>Fold.GR),]}
+  if (!missing(Fold.RNAP2)) {dat <- dat[which(abs(dat$Fold.RNAP2)>Fold.RNAP2),]}
+  #GENEBIOTYPE: "antisense","lincRNA","LRG_gene","miRNA","protein_coding","snoRNA","TEC"
+  if (!missing(GENEBIOTYPE)) {
+   dat <- dat[which(dat$GENEBIOTYPE%in%GENEBIOTYPE),]
+  }
+  return(dat)
+}
+```
+
+```{r sel, eval=T, echo=F}
+if (!exists("Fold.GR")) {Fold.GR=0}
+if (!exists("Fold.RNAP2")) {Fold.RNAP2=0}
+if (!exists("GENEBIOTYPE")) {GENEBIOTYPE=c("antisense","lincRNA","LRG_gene","miRNA","protein_coding","snoRNA","TEC")}
+GR_RNAP2=sel_func(dat=GR_RNAP2, Fold.GR=Fold.GR, Fold.RNAP2=Fold.RNAP2, GENEBIOTYPE=GENEBIOTYPE)
+cat(nrow(GR_RNAP2),"genes have both GR and RNAP2 peaks within the defined promotoer regions\n")
+```
+
+```{r show, eval=T, echo=F}
+pander(sort(unique(GR_RNAP2$SYMBOL)))
+```
+
+```{r overlap_save, eval=T, echo=F}
+write.table(GR_RNAP2,out_fn,row.names=F,col.names=T,quote=F,sep="\t")
+```
+
+### Distribution of GR and RNAP2 peaks near promoter regions
+
+```{r overlap_venn, eval=T, echo=F}
+gr <- data.frame(gene=GR_overlap$gene_id, GR=rep(1,nrow(GR_overlap)))
+rnap2 <- data.frame(gene=RNAP2_overlap$gene_id, RNAP2=rep(1,nrow(RNAP2_overlap)))
+venn_dt <- merge(gr,rnap2, by="gene",all=T)
+venn_dt[is.na(venn_dt)] <- 0
+vennDiagram(venn_dt[,-1],main="Genes with both GR and RNP2 binding sites nearby its promoter")
+```
+
+```{r overlap_dist2TSS, eval=T, echo=F, message=F, warning=F, results="hide", fig.height=2}
+plotDistToTSS(annotatePeak(makeGRangesFromDataFrame(GR_overlap), tssRegion=c(-3000, 10000),TxDb=txdb, annoDb=annoDb_name),title="GR binding site near promoter regions") + scale_fill_brewer(palette = "RdPu")
+plotDistToTSS(annotatePeak(makeGRangesFromDataFrame(RNAP2_overlap), tssRegion=c(-3000, 10000),TxDb=txdb, annoDb=annoDb_name),title="RNAP2 binding site near promoter regions")+ scale_fill_brewer(palette = "RdPu")
+```
+
+```{r session_info, eval=T, echo=F}
+pander(sessionInfo())
+```
+

@@ -106,10 +106,10 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
     outp.write("Differential binding site analysis was done for all comparisons provided in the comparisons file, using DESeq2 by default.<br>\n\n")
     if ref_genome=="hg38":
         txdb="TxDb.Hsapiens.UCSC.hg38.knownGene"
-        annoDb="org.Hs.eg.db"
+        annoDb="EnsDb.Hsapiens.v79"
     elif ref_genome=="hg19":
         txdb="TxDb.Hsapiens.UCSC.hg19.knownGene"
-        annoDb="org.Hs.eg.db"
+        annoDb="EnsDb.Hsapiens.v75"
     outp.write("Peaks were annotated using corresponding R packages "+ annoDb +" and "+ txdb +" by ChIPseeker ("+chipseeker_version+").<br>\n\n")
 
     # Load library and set variables

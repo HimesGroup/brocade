@@ -21,12 +21,12 @@ DiffBind (2.6.6) was used for differential binding site analaysis, based on the 
 
 Differential binding site analysis was done for all comparisons provided in the comparisons file, using DESeq2 by default.<br>
 
-Peaks were annotated using corresponding R packages org.Hs.eg.db and TxDb.Hsapiens.UCSC.hg38.knownGene by ChIPseeker (1.14.2).<br>
+Peaks were annotated using corresponding R packages EnsDb.Hsapiens.v79 and TxDb.Hsapiens.UCSC.hg38.knownGene by ChIPseeker (1.14.2).<br>
 
 
 
 ```{r lib, echo=F, message=F, warning=F}
-annoDb_name='org.Hs.eg.db'
+annoDb_name='EnsDb.Hsapiens.v79'
 txdb_name='TxDb.Hsapiens.UCSC.hg38.knownGene'
 library(annoDb_name,character.only = TRUE)
 library(txdb_name,character.only = TRUE)
@@ -200,10 +200,14 @@ dat.gr.tb=data.frame(Chr=seqnames(dat.gr),
 ID=paste(dat.gr.tb$Chr, dat.gr.tb$Start, dat.gr.tb$End, sep='_')
 # annoate with flanking region
 dat.anno <- annotatePeak(peak=dat.gr, tssRegion = c(-tss_span,tss_span), TxDb = txdb, annoDb=annoDb_name,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
-# create vector with ENTREZID corresponding to gene symbol
-annoDb_symbol=paste0(gsub('.db','',annoDb_name),'SYMBOL')
-symbol_vec=as.data.frame(get(annoDb_symbol))[,'symbol']
-names(symbol_vec)=as.data.frame(get(annoDb_symbol))[,'gene_id']
+# obtain all flanking gene_ids (ENTREZID)
+gene_ids=unique(unlist(lapply(as.data.frame(dat.anno)$flank_geneIds,function(x){gene_ids=unique(strsplit(x,split=';')[[1]])})))
+gene_ids=gene_ids[!is.na(gene_ids)]
+# obtain gene symbol for corresponding ENTREZID 
+symbols=AnnotationDbi::select(get(annoDb_name),gene_ids,columns=c("ENTREZID","SYMBOL"),keytype="ENTREZID")
+# create vector of gene symbol with names as ENTREZID    
+symbol_vec=symbols$SYMBOL
+names(symbol_vec)=symbols$ENTREZID
 # convert ENTREZID to symbol for flanking genes
 flank_symbol <- unname(sapply(as.data.frame(dat.anno)$flank_geneIds,function(x){
   if (is.na(x)){symbol='NA'} else{
@@ -229,9 +233,6 @@ dat.anno.tb <- data.frame(
 # differential analysis results
 res_df=data.frame(dat.gr.tb,dat.stat,dat.anno.tb, ID=ID)
 res_ct_df=data.frame(ID=ID,dat.count)
-res_ct_df <- res_ct_df %>% gather(Sample, count, -ID)
-res_ct_df <- merge(res_ct_df,coldata[which(coldata$Sample%in%res_ct_df$Sample),c("Sample","Status")],by="Sample")
-res_ct_df$Status <- factor(res_ct_df$Status, levels = c(cond0,cond1))
 if (!rep) {res_df=res_df[order(abs(res_df$Fold),decreasing=TRUE),]}
 ```
 
@@ -512,6 +513,11 @@ boxplot_func <- function(df) {
 
 ```{r, eval=T, echo=F, message=F, cache=F, warning=F, fig.height=4, fig.width=4}
 topnum=20
+# assign status to count data
+res_ct_df <- res_ct_df %>% gather(Sample, count, -ID)
+res_ct_df <- merge(res_ct_df,coldata[which(coldata$Sample%in%res_ct_df$Sample),c("Sample","Status")],by="Sample")
+res_ct_df$Status <- factor(res_ct_df$Status, levels = c(cond0,cond1))
+# boxplot
 for (i in 1:topnum) {
   gene_id <- res_df[i,"ID"]
   gene_symbol <- res_df[i,"Gene"]
@@ -701,10 +707,14 @@ dat.gr.tb=data.frame(Chr=seqnames(dat.gr),
 ID=paste(dat.gr.tb$Chr, dat.gr.tb$Start, dat.gr.tb$End, sep='_')
 # annoate with flanking region
 dat.anno <- annotatePeak(peak=dat.gr, tssRegion = c(-tss_span,tss_span), TxDb = txdb, annoDb=annoDb_name,overlap='all',addFlankGeneInfo=T, flankDistance=flank_span)
-# create vector with ENTREZID corresponding to gene symbol
-annoDb_symbol=paste0(gsub('.db','',annoDb_name),'SYMBOL')
-symbol_vec=as.data.frame(get(annoDb_symbol))[,'symbol']
-names(symbol_vec)=as.data.frame(get(annoDb_symbol))[,'gene_id']
+# obtain all flanking gene_ids (ENTREZID)
+gene_ids=unique(unlist(lapply(as.data.frame(dat.anno)$flank_geneIds,function(x){gene_ids=unique(strsplit(x,split=';')[[1]])})))
+gene_ids=gene_ids[!is.na(gene_ids)]
+# obtain gene symbol for corresponding ENTREZID 
+symbols=AnnotationDbi::select(get(annoDb_name),gene_ids,columns=c("ENTREZID","SYMBOL"),keytype="ENTREZID")
+# create vector of gene symbol with names as ENTREZID    
+symbol_vec=symbols$SYMBOL
+names(symbol_vec)=symbols$ENTREZID
 # convert ENTREZID to symbol for flanking genes
 flank_symbol <- unname(sapply(as.data.frame(dat.anno)$flank_geneIds,function(x){
   if (is.na(x)){symbol='NA'} else{
@@ -730,9 +740,6 @@ dat.anno.tb <- data.frame(
 # differential analysis results
 res_df=data.frame(dat.gr.tb,dat.stat,dat.anno.tb, ID=ID)
 res_ct_df=data.frame(ID=ID,dat.count)
-res_ct_df <- res_ct_df %>% gather(Sample, count, -ID)
-res_ct_df <- merge(res_ct_df,coldata[which(coldata$Sample%in%res_ct_df$Sample),c("Sample","Status")],by="Sample")
-res_ct_df$Status <- factor(res_ct_df$Status, levels = c(cond0,cond1))
 if (!rep) {res_df=res_df[order(abs(res_df$Fold),decreasing=TRUE),]}
 ```
 
@@ -1013,6 +1020,11 @@ boxplot_func <- function(df) {
 
 ```{r, eval=T, echo=F, message=F, cache=F, warning=F, fig.height=4, fig.width=4}
 topnum=20
+# assign status to count data
+res_ct_df <- res_ct_df %>% gather(Sample, count, -ID)
+res_ct_df <- merge(res_ct_df,coldata[which(coldata$Sample%in%res_ct_df$Sample),c("Sample","Status")],by="Sample")
+res_ct_df$Status <- factor(res_ct_df$Status, levels = c(cond0,cond1))
+# boxplot
 for (i in 1:topnum) {
   gene_id <- res_df[i,"ID"]
   gene_symbol <- res_df[i,"Gene"]

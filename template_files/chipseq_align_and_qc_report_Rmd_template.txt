@@ -158,7 +158,7 @@ bamstats.summary <- bamstats.data
 row.names(bamstats.summary)=bamstats.summary$Type
 bamstats.summary$Type=NULL
 if (library_type %in% c("PE")) { # total read counts from fastq
-  total_reads=unique.counts.data$R1_Raw_Reads+total_reads=unique.counts.data$R2_Raw_Reads
+  total_reads=unique.counts.data$R1_Raw_Reads+total_reads+unique.counts.data$R2_Raw_Reads
   bamstats.summary <- bamstats.summary[!row.names(bamstats.summary)%in%c("Failed QC","Duplicates"), , drop=FALSE]
 } else {
   # total read counts from fastq
@@ -218,6 +218,7 @@ ggplot(data = mapped.percent.for.plot, aes(x = variable, y = value, fill=Type)) 
 
 
 ```{r setup, echo=FALSE}
+
 instertsize <- if (library_type %in% c("PE")) {TRUE} else {FALSE}   #use this to replace all the if conditions in subsequent code chunks
 ```
 

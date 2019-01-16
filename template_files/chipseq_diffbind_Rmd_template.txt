@@ -7,7 +7,8 @@ Prepare diffbind csv input file
 coldata_curr <- coldata[which(coldata$Status==cond1 | coldata$Status==cond0),]
 #modify to diffbind input format
 library(dplyr)
-input_csv <- coldata_curr %>%
+if("Input" %in% colnames(coldata)){
+  input_csv <- coldata_curr %>%
   dplyr::mutate(SampleID=Sample, Factor=Antibody, ControlID=Input, PeakCaller="bed") %>%
   dplyr::mutate(Condition=ifelse(Status==cond1,"cond1","cond0")) %>%
   dplyr::group_by(Treatment) %>%
@@ -15,6 +16,16 @@ input_csv <- coldata_curr %>%
   dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl, Peaks, PeakCaller) %>%
   dplyr::arrange(Condition) %>%
   as.data.frame()
+  } else {
+  input_csv <- coldata_curr %>%
+  dplyr::mutate(SampleID=Sample, Factor=Antibody, PeakCaller="bed") %>%
+  dplyr::mutate(Condition=ifelse(Status==cond1,"cond1","cond0")) %>%
+  dplyr::group_by(Treatment) %>%
+  dplyr::mutate(Replicate=1:length(Treatment)) %>%
+  dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads,Peaks, PeakCaller) %>%
+  dplyr::arrange(Condition) %>%
+  as.data.frame()
+}
 detach("package:dplyr")
 write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"),row.names=F)
 DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
@@ -455,7 +466,7 @@ Average Profile of ChIP peaks binding to TSS region (right).
 if (rep) {
   # redo diffbind analysis and annotation only using significant peaks
   dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
-  if (length(dat.report)>500) {
+  if (length(dat.report.sig)>500) {
     cat("Use significant binding sites only.\n")
     dat.gr.sig=granges(dat.report.sig)
   } else {

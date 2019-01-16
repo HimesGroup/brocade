@@ -337,24 +337,29 @@ coldata <- read.table(sample_info_file,header=T,sep='\t')
 
 # Create bam read columns
 coldata$bamReads=paste0(path_start,coldata$Sample,'/bwa_out/',coldata$Sample,'.bam')
-bamreads=coldata$bamReads[!is.na(coldata$Input)]
+if("Input" %in% colnames(coldata)){
+  bamreads=coldata$bamReads[!is.na(coldata$Input)]
+} else { bamreads=coldata$bamReads}
 nobamReads=bamreads[!sapply(bamreads,file.exists)]
 if (length(nobamReads)>1) {stop('Bam read file(s) do not exists: ',paste(nobamReads,collapse=', '))}
 
 # Create bam control columns
-coldata$bamControl=paste0(path_start,coldata$Input,'/bwa_out/',coldata$Input,'.bam')
+if("Input" %in% colnames(coldata)){coldata$bamControl=paste0(path_start,coldata$Input,'/bwa_out/',coldata$Input,'.bam')
 bamcontrols=coldata$bamControl[!is.na(coldata$Input)]
 nobamControl=bamcontrols[!sapply(bamcontrols,file.exists)]
-if (length(nobamControl)>1) {stop('Bam control file(s) do not exists: ',paste(nobamControl,collapse=', '))}
+if (length(nobamControl)>1) {stop('Bam control file(s) do not exists: ',paste(nobamControl,collapse=', '))}}
 
 # Create peak bed columns
 coldata$Peaks=paste0(path_start,coldata$Sample,'/macs2_out/',coldata$Sample,'.blackfilt.bed')
-bedpeaks=coldata$Peaks[!is.na(coldata$Input)]
-nobed=bedpeaks[!sapply(bamcontrols,file.exists)]
+if("Input" %in% colnames(coldata)){
+  bedpeaks=coldata$Peaks[!is.na(coldata$Input)]
+} else {bedpeaks=coldata$Peaks}
+nobed=bedpeaks[!sapply(bedpeaks,file.exists)]
 if (length(nobed)>1) {stop('Peak bed file(s) do not exists: ',paste(nobed,collapse=', '))}
 
 #modify to diffbind input format
-input_csv <- coldata %>%
+if("Input" %in% colnames(coldata)){
+  input_csv <- coldata %>%
   dplyr::filter(!Antibody%in%"Input") %>%
   dplyr::mutate(SampleID=Sample, Factor=Antibody, ControlID=Input, PeakCaller="bed") %>%
   dplyr::mutate(Condition=Status) %>%
@@ -364,6 +369,18 @@ input_csv <- coldata %>%
   dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl, Peaks, PeakCaller) %>%
   as.data.frame() %>%
   droplevels()
+} else {
+  input_csv <- coldata %>%
+  dplyr::filter(!Antibody%in%"Input") %>%
+  dplyr::mutate(SampleID=Sample, Factor=Antibody, PeakCaller="bed") %>%
+  dplyr::mutate(Condition=Status) %>%
+  dplyr::group_by(Status,Treatment) %>%
+  dplyr::mutate(Replicate=1:length(Treatment)) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, Peaks, PeakCaller) %>%
+  as.data.frame() %>%
+  droplevels()
+}
 write.csv(input_csv,paste0(project_name,".sampleinfo.csv"),row.names=F)
 ```
 

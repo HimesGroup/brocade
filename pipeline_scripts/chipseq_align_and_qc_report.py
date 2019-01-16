@@ -547,7 +547,7 @@ def make_rmd_html(sample_info_file, project_name, path_start, new_dir, sample_na
     rmd = rmd + rmd_var
 
     # read in contents in template Rmdfile
-    rmd_in = open(template_dir+"chipseq_align_and_qc_report_Rmd_template_temp.txt", "r")
+    rmd_in = open(template_dir+"chipseq_align_and_qc_report_Rmd_template.txt", "r")
     rmd_template = rmd_in.read()
     rmd = rmd + rmd_template
     rmd = rmd + "\n\n"
@@ -595,8 +595,8 @@ def main(project_name, sample_info_file, path_start, ref_genome, library_type, t
         template_dir = template_dir+"/"
 
     # check if QC template txt file exists
-    if not os.path.exists(template_dir+"chipseq_align_and_qc_report_Rmd_template_temp.txt"):
-        print "Cannot find "+template_dir+"chipseq_align_and_qc_report_Rmd_template_temp.txt"
+    if not os.path.exists(template_dir+"chipseq_align_and_qc_report_Rmd_template.txt"):
+        print "Cannot find "+template_dir+"chipseq_align_and_qc_report_Rmd_template.txt"
 	sys.exit()
 
     #Get list of dictionary of sample information. Keys: [sample_id, ercc_mix, index]

@@ -210,11 +210,11 @@ def main(project_name, sample_info_file, path_start, comp_file, template_dir, re
         sys.exit()
 
     # check if diffbine template file exists
-    if not os.path.exists(template_dir+"chipseq_diffbind_Rmd_template_temp.txt"):
+    if not os.path.exists(template_dir+"chipseq_diffbind_Rmd_template.txt"):
         print "Cannot find chipseq_diffbind_Rmd_template.txt"
 	sys.exit()
 
-    rmd_in = open(template_dir+"chipseq_diffbind_Rmd_template_temp.txt", "r")
+    rmd_in = open(template_dir+"chipseq_diffbind_Rmd_template.txt", "r")
     rmd_template = rmd_in.readlines()
     make_diffbind_html(rmd_template, project_name, path_start, sample_info_file, ref_genome, comp_file)
 

@@ -134,7 +134,8 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
     outp.write("Create bam read columns\n")
     outp.write("```{r bamReads, eval=T, echo=F}\n")
     outp.write("coldata$bamReads=paste0(path_start,coldata$Sample,'/bwa_out/',coldata$Sample,'.bam')\n")
-    outp.write("bamreads=coldata$bamReads[!is.na(coldata$Input)]\n")
+    outp.write("if('Input' %in% colnames(coldata)){bamreads=coldata$bamReads[!is.na(coldata$Input)]\n")
+    outp.write("} else {bamreads=coldata$bamReads}\n")
     outp.write("nobamReads=bamreads[!sapply(bamreads,file.exists)]\n")
     outp.write("if (length(nobamReads)>1) {stop('Bam read file(s) do not exists: ',paste(nobamReads,collapse=', '))}\n")
     outp.write("```\n\n")
@@ -142,18 +143,19 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
     # create DiffBind bam control files
     outp.write("Create bam control columns\n")
     outp.write("```{r bamControl, eval=T, echo=F}\n")
-    outp.write("coldata$bamControl=paste0(path_start,coldata$Input,'/bwa_out/',coldata$Input,'.bam')\n")
+    outp.write("if('Input' %in% colnames(coldata)){coldata$bamControl=paste0(path_start,coldata$Input,'/bwa_out/',coldata$Input,'.bam')\n")
     outp.write("bamcontrols=coldata$bamControl[!is.na(coldata$Input)]\n")
     outp.write("nobamControl=bamcontrols[!sapply(bamcontrols,file.exists)]\n")
-    outp.write("if (length(nobamControl)>1) {stop('Bam control file(s) do not exists: ',paste(nobamControl,collapse=', '))}\n")
+    outp.write("if (length(nobamControl)>1) {stop('Bam control file(s) do not exists: ',paste(nobamControl,collapse=', '))}}\n")
     outp.write("```\n\n")
 
     # create DiffBind peak bed files
     outp.write("Create peak bed columns\n")
     outp.write("```{r bed, eval=T, echo=F}\n")
     outp.write("coldata$Peaks=paste0(path_start,coldata$Sample,'/macs2_out/',coldata$Sample,'.blackfilt.bed')\n")
-    outp.write("bedpeaks=coldata$Peaks[!is.na(coldata$Input)]\n")
-    outp.write("nobed=bedpeaks[!sapply(bamcontrols,file.exists)]\n")
+    outp.write("if('Input' %in% colnames(coldata)){bedpeaks=coldata$Peaks[!is.na(coldata$Input)]\n")
+    outp.write("} else {bedpeaks=coldata$Peaks}\n")
+    outp.write("nobed=bedpeaks[!sapply(bedpeaks,file.exists)]\n")
     outp.write("if (length(nobed)>1) {stop('Peak bed file(s) do not exists: ',paste(nobed,collapse=', '))}\n")
     outp.write("```\n\n")
 
@@ -208,11 +210,11 @@ def main(project_name, sample_info_file, path_start, comp_file, template_dir, re
         sys.exit()
 
     # check if diffbine template file exists
-    if not os.path.exists(template_dir+"chipseq_diffbind_Rmd_template.txt"):
+    if not os.path.exists(template_dir+"chipseq_diffbind_Rmd_template_temp.txt"):
         print "Cannot find chipseq_diffbind_Rmd_template.txt"
 	sys.exit()
 
-    rmd_in = open(template_dir+"chipseq_diffbind_Rmd_template.txt", "r")
+    rmd_in = open(template_dir+"chipseq_diffbind_Rmd_template_temp.txt", "r")
     rmd_template = rmd_in.readlines()
     make_diffbind_html(rmd_template, project_name, path_start, sample_info_file, ref_genome, comp_file)
 

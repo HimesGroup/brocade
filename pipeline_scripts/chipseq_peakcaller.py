@@ -52,15 +52,20 @@ def macs2_peakcall(curr_sample, curr_control, curr_peak, path_start):
     """
     Use macs2 for peak calling
     """
-
     control_bam=path_start+curr_control+"/bwa_out/"+curr_control+".bam"
     treatment_bam=path_start+curr_sample+"/bwa_out/"+curr_sample+".bam"
     macs2_dir=path_start+"/"+curr_sample+"/"+"macs2_out/"
     cmd="mkdir "+macs2_dir+"\n"
+    
+    if curr_control == " ":
+        cmd=cmd+"macs2 callpeak -t "+treatment_bam+" -n "+curr_sample+" --outdir "+macs2_dir
+    elif curr_control != " ":
+        cmd=cmd+"macs2 callpeak -c "+control_bam+" -t "+treatment_bam+" -n "+curr_sample+" --outdir "+macs2_dir
+    
     if curr_peak=="narrow":
-        cmd=cmd+"macs2 callpeak -c "+control_bam+" -t "+treatment_bam+" -n "+curr_sample+" --outdir "+macs2_dir+" -f BAM -g hs -B -q 0.01"
+        cmd=cmd+" -f BAM -g hs -B -q 0.01"
     else:
-        cmd=cmd+"macs2 callpeak -c "+control_bam+" -t "+treatment_bam+" -n "+curr_sample+" --outdir "+macs2_dir+" --broad -f BAM -g hs -B -q 0.01"
+        cmd=cmd+" --broad -f BAM -g hs -B -q 0.01"
 
     cmd=cmd+"\n"
     return cmd
@@ -143,13 +148,13 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
     if path_start == "./":
         path_start = os.getcwd()
     if path_start[-1] != "/":
-	path_start = path_start+"/"
+        path_start = path_start+"/"
 
     # Set up template directory
     if template_dir == "./":
         template_dir = os.getcwd()
     if template_dir[-1] != "/":
-	template_dir = template_dir+"/"
+        template_dir = template_dir+"/"
 
 
     # check if sample info exists
@@ -166,9 +171,9 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
     # Obtain input DNA sample
     if "Input" not in info_dict:
         print "No input DNA is provided."
-        sys.exit()
-
-    controls = info_dict["Input"]
+        controls = [" "] * len(sample_names)
+    elif "Input" in info_dict:
+        controls = info_dict["Input"]
 
     #Concatenate the input files if input_bam
     if input_bam:

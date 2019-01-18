@@ -41,13 +41,15 @@ library(gplots)
 library(RColorBrewer)
 library(viridis)
 library(pander)
+library(seqLogo)
 options(width = 1000)
 ```
 
-```{r vars, eval=T, echo=F}
+```{r vars, echo=F}
 project_name="GSE95632"
 path_start='/home/mengykan/Projects/GSE95632/'
 out_dir='/home/mengykan/Projects/GSE95632/GSE95632_diffbind_out/'
+ref_fa='/project/bhimeslab/Reference/hg38/genome.ERCC.fa'
 coldata <- read.table('/home/mengykan/Projects/GSE95632/files/GSE95632_Phenotype_withQC.txt', sep='\t', header=TRUE)
 coldata <- subset(coldata, QC_Pass==1)
 tss_span=3000 # region range of transcription starting site
@@ -57,24 +59,26 @@ flank_span=10000 # # region with peak +/-span
 Create bam read columns
 ```{r bamReads, eval=T, echo=F}
 coldata$bamReads=paste0(path_start,coldata$Sample,'/bwa_out/',coldata$Sample,'.bam')
-bamreads=coldata$bamReads[!is.na(coldata$Input)]
+if('Input' %in% colnames(coldata)){bamreads=coldata$bamReads[!is.na(coldata$Input)]
+} else {bamreads=coldata$bamReads}
 nobamReads=bamreads[!sapply(bamreads,file.exists)]
 if (length(nobamReads)>1) {stop('Bam read file(s) do not exists: ',paste(nobamReads,collapse=', '))}
 ```
 
 Create bam control columns
 ```{r bamControl, eval=T, echo=F}
-coldata$bamControl=paste0(path_start,coldata$Input,'/bwa_out/',coldata$Input,'.bam')
+if('Input' %in% colnames(coldata)){coldata$bamControl=paste0(path_start,coldata$Input,'/bwa_out/',coldata$Input,'.bam')
 bamcontrols=coldata$bamControl[!is.na(coldata$Input)]
 nobamControl=bamcontrols[!sapply(bamcontrols,file.exists)]
-if (length(nobamControl)>1) {stop('Bam control file(s) do not exists: ',paste(nobamControl,collapse=', '))}
+if (length(nobamControl)>1) {stop('Bam control file(s) do not exists: ',paste(nobamControl,collapse=', '))}}
 ```
 
 Create peak bed columns
 ```{r bed, eval=T, echo=F}
 coldata$Peaks=paste0(path_start,coldata$Sample,'/macs2_out/',coldata$Sample,'.blackfilt.bed')
-bedpeaks=coldata$Peaks[!is.na(coldata$Input)]
-nobed=bedpeaks[!sapply(bamcontrols,file.exists)]
+if('Input' %in% colnames(coldata)){bedpeaks=coldata$Peaks[!is.na(coldata$Input)]
+} else {bedpeaks=coldata$Peaks}
+nobed=bedpeaks[!sapply(bedpeaks,file.exists)]
 if (length(nobed)>1) {stop('Peak bed file(s) do not exists: ',paste(nobed,collapse=', '))}
 ```
 
@@ -94,13 +98,25 @@ Prepare diffbind csv input file
 coldata_curr <- coldata[which(coldata$Status==cond1 | coldata$Status==cond0),]
 #modify to diffbind input format
 library(dplyr)
-input_csv <- coldata_curr %>%
+if("Input" %in% colnames(coldata)){
+  input_csv <- coldata_curr %>%
   dplyr::mutate(SampleID=Sample, Factor=Antibody, ControlID=Input, PeakCaller="bed") %>%
   dplyr::mutate(Condition=ifelse(Status==cond1,"cond1","cond0")) %>%
   dplyr::group_by(Treatment) %>%
   dplyr::mutate(Replicate=1:length(Treatment)) %>%
   dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl, Peaks, PeakCaller) %>%
+  dplyr::arrange(Condition) %>%
   as.data.frame()
+  } else {
+  input_csv <- coldata_curr %>%
+  dplyr::mutate(SampleID=Sample, Factor=Antibody, PeakCaller="bed") %>%
+  dplyr::mutate(Condition=ifelse(Status==cond1,"cond1","cond0")) %>%
+  dplyr::group_by(Treatment) %>%
+  dplyr::mutate(Replicate=1:length(Treatment)) %>%
+  dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads,Peaks, PeakCaller) %>%
+  dplyr::arrange(Condition) %>%
+  as.data.frame()
+}
 detach("package:dplyr")
 write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"),row.names=F)
 DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
@@ -324,7 +340,7 @@ volplot_func <- function(df,qval_column,title) {
     signum = paste0(length(diffgenes), " significant binding sites")
     if (missing(title)) {title=signum}
     print(
-    ggplot(df, aes(x = Fold, y = logqval, color=sig)) + geom_point() +
+    ggplot(df, aes(x = Fold, y = logqval, color=sig)) + geom_point(size=0.5) +
       theme_bw() +
       labs(title=title,x="log2FoldChange",y=paste0("-log10(",qval_column,")")) +
       scale_color_manual(values=color) +
@@ -541,7 +557,7 @@ Average Profile of ChIP peaks binding to TSS region (right).
 if (rep) {
   # redo diffbind analysis and annotation only using significant peaks
   dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
-  if (length(dat.report)>500) {
+  if (length(dat.report.sig)>500) {
     cat("Use significant binding sites only.\n")
     dat.gr.sig=granges(dat.report.sig)
   } else {
@@ -584,6 +600,70 @@ legend("center",legend = labels,fill=anno_cols, bty="n")
 plotDistToTSS(dat.anno.sig)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
 ```
 
+### Motif Identification
+
+Obtain peak bed file for motif identification. Select peaks with increased binding events (log2 fold change >0), and apply for the following selection but keep more than 5,000 peaks 1) significant increase in binding (FDR <0.05), and 2) log2 fold change >2
+
+```{r eval=T, echo=F}
+# select peaks
+peak_df <- res_df
+peak_df <- peak_df[which(peak_df$Fold>0),] # select peaks with increased binding event
+if (nrow(peak_df)>5000) {
+  peak_df <- peak_df[which(peak_df$FDR<0.05),] # select significant peaks
+  if (nrow(peak_df)>5000) {
+    peak_df <- peak_df[which(peak_df$Fold>2),] # select peaks with log2 fold change >2
+  }
+}
+# create bed file
+peak_df$Start=peak_df$Start-1
+peak_df$Strand <- "."
+peak_df <- peak_df[,c("Chr","Start","End")]
+```
+
+```{r eval=T, echo=F, warning=F}
+homer_dir <- paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_homer")
+dir.create(homer_dir)
+peak_bed <- paste0(homer_dir,"/",project_name,"_",cond1,"_vs_",cond0,"_homer.bed")
+write.table(peak_df, peak_bed, row.names=F, col.names=F, sep='\t', quote=F)
+```
+
+Run HOMER to identify known and novel motif
+
+```{r eval=T, echo=F}
+homer_cmd=paste0("findMotifsGenome.pl ", peak_bed, " ", ref_fa, " ", homer_dir, " -mask")
+system(homer_cmd, wait = TRUE)
+```
+
+#### Known motif
+
+Show top 10 known motif
+
+```{r eval=T, echo=F, warning=F, message=F, results="asis", fig.height=3.5, fig.width=5}
+seqlogo_func <- function(fn) {
+  df <- read.table(fn,header=FALSE,skip=1,sep='\t')
+  df <- apply(df,1,function(x){x})
+  row.names(df) <- c("A","C","G","T")
+  pwm <- makePWM(df)
+  seqLogo(pwm)
+}
+
+known_motif_fn <- paste0(homer_dir, "/knownResults.txt")
+if (!file.exists(known_motif_fn)) {stop(paste0("Motif file ",known_motif_fn,"does not exist"))}
+known_motif <- read.table(known_motif_fn,header=FALSE,skip=1,sep='\t')
+names(known_motif) <- c("Motif Name", "Consensus", "pval", "LogPval", "qval", "num_target_seq_with_motif", "percentage_target_seq_with_motif", "num_background_seq_with_motif", "percentage_background_seq_with_motif")
+dt=known_motif[1:10,c("Motif Name", "Consensus", "pval", "qval", "num_target_seq_with_motif", "percentage_target_seq_with_motif")]
+row.names(dt)<- NULL
+pandoc.table(dt, split.tables=Inf)
+```
+
+Sequence logo of top 5 known motif
+
+```{r eval=T, echo=F, warning=F, message=F, results="asis", fig.height=3.5, fig.width=5}
+for (i in 1:5) {
+  motif_fn <- paste0(homer_dir,"/knownResults/known",i,".motif")
+  seqlogo_func(fn=motif_fn)
+}
+```
 
 ## RNAP2_dex vs. RNAP2_EtOH
 
@@ -601,13 +681,25 @@ Prepare diffbind csv input file
 coldata_curr <- coldata[which(coldata$Status==cond1 | coldata$Status==cond0),]
 #modify to diffbind input format
 library(dplyr)
-input_csv <- coldata_curr %>%
+if("Input" %in% colnames(coldata)){
+  input_csv <- coldata_curr %>%
   dplyr::mutate(SampleID=Sample, Factor=Antibody, ControlID=Input, PeakCaller="bed") %>%
   dplyr::mutate(Condition=ifelse(Status==cond1,"cond1","cond0")) %>%
   dplyr::group_by(Treatment) %>%
   dplyr::mutate(Replicate=1:length(Treatment)) %>%
   dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads, ControlID, bamControl, Peaks, PeakCaller) %>%
+  dplyr::arrange(Condition) %>%
   as.data.frame()
+  } else {
+  input_csv <- coldata_curr %>%
+  dplyr::mutate(SampleID=Sample, Factor=Antibody, PeakCaller="bed") %>%
+  dplyr::mutate(Condition=ifelse(Status==cond1,"cond1","cond0")) %>%
+  dplyr::group_by(Treatment) %>%
+  dplyr::mutate(Replicate=1:length(Treatment)) %>%
+  dplyr::select(SampleID, Tissue, Factor, Condition, Treatment, Replicate, bamReads,Peaks, PeakCaller) %>%
+  dplyr::arrange(Condition) %>%
+  as.data.frame()
+}
 detach("package:dplyr")
 write.csv(input_csv,paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,".sampleinfo.csv"),row.names=F)
 DT::datatable(input_csv,rownames=FALSE, options = list(columnDefs = list(list(className = 'dt-center', targets = "_all"))))
@@ -831,7 +923,7 @@ volplot_func <- function(df,qval_column,title) {
     signum = paste0(length(diffgenes), " significant binding sites")
     if (missing(title)) {title=signum}
     print(
-    ggplot(df, aes(x = Fold, y = logqval, color=sig)) + geom_point() +
+    ggplot(df, aes(x = Fold, y = logqval, color=sig)) + geom_point(size=0.5) +
       theme_bw() +
       labs(title=title,x="log2FoldChange",y=paste0("-log10(",qval_column,")")) +
       scale_color_manual(values=color) +
@@ -1048,7 +1140,7 @@ Average Profile of ChIP peaks binding to TSS region (right).
 if (rep) {
   # redo diffbind analysis and annotation only using significant peaks
   dat.report.sig <-  dba.report(dat.bind, bCounts=T, bNormalized=T) # only report significant results
-  if (length(dat.report)>500) {
+  if (length(dat.report.sig)>500) {
     cat("Use significant binding sites only.\n")
     dat.gr.sig=granges(dat.report.sig)
   } else {
@@ -1091,6 +1183,70 @@ legend("center",legend = labels,fill=anno_cols, bty="n")
 plotDistToTSS(dat.anno.sig)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
 ```
 
+### Motif Identification
+
+Obtain peak bed file for motif identification. Select peaks with increased binding events (log2 fold change >0), and apply for the following selection but keep more than 5,000 peaks 1) significant increase in binding (FDR <0.05), and 2) log2 fold change >2
+
+```{r eval=T, echo=F}
+# select peaks
+peak_df <- res_df
+peak_df <- peak_df[which(peak_df$Fold>0),] # select peaks with increased binding event
+if (nrow(peak_df)>5000) {
+  peak_df <- peak_df[which(peak_df$FDR<0.05),] # select significant peaks
+  if (nrow(peak_df)>5000) {
+    peak_df <- peak_df[which(peak_df$Fold>2),] # select peaks with log2 fold change >2
+  }
+}
+# create bed file
+peak_df$Start=peak_df$Start-1
+peak_df$Strand <- "."
+peak_df <- peak_df[,c("Chr","Start","End")]
+```
+
+```{r eval=T, echo=F, warning=F}
+homer_dir <- paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_homer")
+dir.create(homer_dir)
+peak_bed <- paste0(homer_dir,"/",project_name,"_",cond1,"_vs_",cond0,"_homer.bed")
+write.table(peak_df, peak_bed, row.names=F, col.names=F, sep='\t', quote=F)
+```
+
+Run HOMER to identify known and novel motif
+
+```{r eval=T, echo=F}
+homer_cmd=paste0("findMotifsGenome.pl ", peak_bed, " ", ref_fa, " ", homer_dir, " -mask")
+system(homer_cmd, wait = TRUE)
+```
+
+#### Known motif
+
+Show top 10 known motif
+
+```{r eval=T, echo=F, warning=F, message=F, results="asis", fig.height=3.5, fig.width=5}
+seqlogo_func <- function(fn) {
+  df <- read.table(fn,header=FALSE,skip=1,sep='\t')
+  df <- apply(df,1,function(x){x})
+  row.names(df) <- c("A","C","G","T")
+  pwm <- makePWM(df)
+  seqLogo(pwm)
+}
+
+known_motif_fn <- paste0(homer_dir, "/knownResults.txt")
+if (!file.exists(known_motif_fn)) {stop(paste0("Motif file ",known_motif_fn,"does not exist"))}
+known_motif <- read.table(known_motif_fn,header=FALSE,skip=1,sep='\t')
+names(known_motif) <- c("Motif Name", "Consensus", "pval", "LogPval", "qval", "num_target_seq_with_motif", "percentage_target_seq_with_motif", "num_background_seq_with_motif", "percentage_background_seq_with_motif")
+dt=known_motif[1:10,c("Motif Name", "Consensus", "pval", "qval", "num_target_seq_with_motif", "percentage_target_seq_with_motif")]
+row.names(dt)<- NULL
+pandoc.table(dt, split.tables=Inf)
+```
+
+Sequence logo of top 5 known motif
+
+```{r eval=T, echo=F, warning=F, message=F, results="asis", fig.height=3.5, fig.width=5}
+for (i in 1:5) {
+  motif_fn <- paste0(homer_dir,"/knownResults/known",i,".motif")
+  seqlogo_func(fn=motif_fn)
+}
+```
 
 ```{r session_info, eval=T, echo=F}
 pander(sessionInfo())

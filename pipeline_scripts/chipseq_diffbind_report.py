@@ -5,9 +5,8 @@ import subprocess
 import os
 import re
 import fnmatch
+import chipseq_userdefine_variables as userdef  # read in user-defined variable python script
 
-# import user-defined parameters
-import chipseq_userdefine_variables as userdef # read in user-defined variable python script
 # import software version
 bwa_version=userdef.bwa_version
 macs2_version=userdef.macs2_version
@@ -78,6 +77,24 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
+    # Obtain reference genome sequence fasta file
+    if ref_genome == "hg38":
+        fa = userdef.hg38_fa
+    elif ref_genome == "hg19":
+        fa = userdef.hg19_fa
+    elif ref_genome == "mm38":
+        fa = userdef.mm38_fa
+    elif ref_genome == "mm10":
+        fa = userdef.mm10_fa
+    elif ref_genome == "rn6":
+        fa = userdef.rn6_fa
+    elif ref_genome == "susScr3":
+        fa = userdef.susScr3_fa
+    else:
+        print "Reference genome fasta file for"+ref_genome+" does not provided."
+        sys.exit()
+
+
     ###
     # Create RMD file for diffbind
     ###
@@ -118,12 +135,13 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
     outp.write("txdb_name='"+txdb+"'\n")
     outp.write("library(annoDb_name,character.only = TRUE)\nlibrary(txdb_name,character.only = TRUE)\n")
     outp.write("txdb=get(txdb_name)\n")
-    outp.write("library(DiffBind)\nlibrary(ChIPseeker)\nlibrary(tidyr)\nlibrary(DT)\nlibrary(devtools)\nlibrary(ggplot2)\nlibrary(gplots)\nlibrary(RColorBrewer)\nlibrary(viridis)\nlibrary(pander)\noptions(width = 1000)\n```\n")
+    outp.write("library(DiffBind)\nlibrary(ChIPseeker)\nlibrary(tidyr)\nlibrary(DT)\nlibrary(devtools)\nlibrary(ggplot2)\nlibrary(gplots)\nlibrary(RColorBrewer)\nlibrary(viridis)\nlibrary(pander)\nlibrary(seqLogo)\noptions(width = 1000)\n```\n")
     outp.write("\n")
-    outp.write("```{r vars, eval=T, echo=F}\n")
+    outp.write("```{r vars, echo=F}\n")
     outp.write("project_name=\""+project_name+"\"\n")
     outp.write("path_start='"+path_start+"'\n")
     outp.write("out_dir='"+out_dir+"'\n")
+    outp.write("ref_fa='"+fa+"'\n")
     outp.write("coldata <- read.table('"+sample_info_file+"', sep='\\t', header=TRUE)\n")
     outp.write("coldata <- subset(coldata, QC_Pass==1)\n")
     outp.write("tss_span=3000 # region range of transcription starting site\n")

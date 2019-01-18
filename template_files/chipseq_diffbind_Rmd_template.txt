@@ -509,3 +509,67 @@ legend("center",legend = labels,fill=anno_cols, bty="n")
 plotDistToTSS(dat.anno.sig)+scale_fill_brewer(palette = "RdPu")+ggtitle("")
 ```
 
+### Motif Identification
+
+Obtain peak bed file for motif identification. Select peaks with increased binding events (log2 fold change >0), and apply for the following selection but keep more than 5,000 peaks 1) significant increase in binding (FDR <0.05), and 2) log2 fold change >2
+
+```{r eval=T, echo=F}
+# select peaks
+peak_df <- res_df
+peak_df <- peak_df[which(peak_df$Fold>0),] # select peaks with increased binding event
+if (nrow(peak_df)>5000) {
+  peak_df <- peak_df[which(peak_df$FDR<0.05),] # select significant peaks
+  if (nrow(peak_df)>5000) {
+    peak_df <- peak_df[which(peak_df$Fold>2),] # select peaks with log2 fold change >2
+  }
+}
+# create bed file
+peak_df$Start=peak_df$Start-1
+peak_df$Strand <- "."
+peak_df <- peak_df[,c("Chr","Start","End")]
+```
+
+```{r eval=T, echo=F, warning=F}
+homer_dir <- paste0(out_dir,project_name,"_",cond1,"_vs_",cond0,"_homer")
+dir.create(homer_dir)
+peak_bed <- paste0(homer_dir,"/",project_name,"_",cond1,"_vs_",cond0,"_homer.bed")
+write.table(peak_df, peak_bed, row.names=F, col.names=F, sep='\t', quote=F)
+```
+
+Run HOMER to identify known and novel motif
+
+```{r eval=T, echo=F}
+homer_cmd=paste0("findMotifsGenome.pl ", peak_bed, " ", ref_fa, " ", homer_dir, " -mask")
+system(homer_cmd, wait = TRUE)
+```
+
+#### Known motif
+
+Show top 10 known motif
+
+```{r eval=T, echo=F, warning=F, message=F, results="asis", fig.height=3.5, fig.width=5}
+seqlogo_func <- function(fn) {
+  df <- read.table(fn,header=FALSE,skip=1,sep='\t')
+  df <- apply(df,1,function(x){x})
+  row.names(df) <- c("A","C","G","T")
+  pwm <- makePWM(df)
+  seqLogo(pwm)
+}
+
+known_motif_fn <- paste0(homer_dir, "/knownResults.txt")
+if (!file.exists(known_motif_fn)) {stop(paste0("Motif file ",known_motif_fn,"does not exist"))}
+known_motif <- read.table(known_motif_fn,header=FALSE,skip=1,sep='\t')
+names(known_motif) <- c("Motif Name", "Consensus", "pval", "LogPval", "qval", "num_target_seq_with_motif", "percentage_target_seq_with_motif", "num_background_seq_with_motif", "percentage_background_seq_with_motif")
+dt=known_motif[1:10,c("Motif Name", "Consensus", "pval", "qval", "num_target_seq_with_motif", "percentage_target_seq_with_motif")]
+row.names(dt)<- NULL
+pandoc.table(dt, split.tables=Inf)
+```
+
+Sequence logo of top 5 known motif
+
+```{r eval=T, echo=F, warning=F, message=F, results="asis", fig.height=3.5, fig.width=5}
+for (i in 1:5) {
+  motif_fn <- paste0(homer_dir,"/knownResults/known",i,".motif")
+  seqlogo_func(fn=motif_fn)
+}
+```

@@ -31,7 +31,7 @@ Automatically generate LSF scripts in each step for HPC use.
 
 ## Prerequisite Files
 
-* **Spesis-specific genome reference files:** reference genome fasta files (.fa) and corresponding BWA index files for alignment, and chromosome length file for creating bigwig files.
+* **Species-specific genome reference files:** reference genome fasta files (.fa) and corresponding BWA index files for alignment, and chromosome length file for creating bigwig files.
 * **Blacklisted region files**: bed files containing "blacklisted regions", i.e. uniquely mappable regions are found at specific types of repeats such as centromeres, telomeres and satellite repeats. These lists are downloaded from [Kundaje Lab](http://mitra.stanford.edu/kundaje/akundaje/release/blacklists/), and converted to .bed file format and provided in **template_files/[ref_genome]_blacklist.bed**.
 * **Adapter and primer sequences**: a list of adapter and primer sequences is provided in **template_files/adapter_primer_sequences.txt**. For fastqc, replace . For trimming we provide adapter and primer sequences for the following types: Ilumina TruSeq single index, Illumina unique dual (UD) index adpter and PrepX. Users can tailor this file by adding sequences from other protocols.
 

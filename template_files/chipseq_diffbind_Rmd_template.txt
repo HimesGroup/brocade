@@ -517,12 +517,12 @@ Obtain peak bed file for motif identification. Select peaks with increased bindi
 # select peaks
 peak_df <- res_df
 peak_df <- peak_df[which(peak_df$Fold>0),] # select peaks with increased binding event
+peak_df.tmp <- peak_df[which(peak_df$FDR<0.05),]
+if (nrow(peak_df.tmp) > 5000) {peak_df <- peak_df.tmp} # select significant peaks
 if (nrow(peak_df)>5000) {
-  peak_df <- peak_df[which(peak_df$FDR<0.05),] # select significant peaks
-  if (nrow(peak_df)>5000) {
-    peak_df <- peak_df[which(peak_df$Fold>2),] # select peaks with log2 fold change >2
+  peak_df <- peak_df[which(peak_df$Fold>2),] # select peaks with log2 fold change >2
   }
-}
+
 # create bed file
 peak_df$Start=peak_df$Start-1
 peak_df$Strand <- "."

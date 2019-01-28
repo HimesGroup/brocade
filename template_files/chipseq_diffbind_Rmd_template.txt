@@ -567,7 +567,8 @@ pandoc.table(dt, split.tables=Inf)
 Sequence logo of top 5 known motif
 
 ```{r eval=T, echo=F, warning=F, message=F, results="asis", fig.height=3.5, fig.width=5}
-for (i in 1:5) {
+if (nrow(known_motif)<5) {nmotif = nrow(known_motif)} else {nmotif = 5}
+for (i in 1:nmotif) {
   motif_fn <- paste0(homer_dir,"/knownResults/known",i,".motif")
   seqlogo_func(fn=motif_fn)
 }

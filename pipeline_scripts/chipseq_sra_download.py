@@ -18,7 +18,7 @@ def make_rmd_html(rmd_template, geo_id, sra_id, project_name, path_start, out_di
 
     outp = open(rmd_file, "w")
     outp.write("---\n")
-    outp.write("title: " + project_name + "SRA download\n")
+    outp.write("title: " + project_name + " SRA download\n")
     outp.write("author: '"+author+"'\n")
     outp.write("date: \"`r format(Sys.time(), '%d %B, %Y')`\"\n")
     outp.write("output:\n")

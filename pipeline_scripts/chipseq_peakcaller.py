@@ -30,18 +30,26 @@ def get_sample_info(fin):
     header = f[0].split('\t') # list
     c = f[1:]
 
-    # Obtain column index from file header
+    # Check if column names exist
     if "Sample" not in header:
         print "Sample column is missing. Please check!"
         sys.exit()
 
-    # Obtain column index from file header
+    if "Input" not in header:
+        print "Input column is missing that defines a sample ID for input DNA as a control for genomic background. Please check!"
+        sys.exit()
+
     if "Antibody" not in header:
         print "Antibody column is missing. Please check!"
         sys.exit()
 
+    if "Peak" not in header:
+        print "Peak column is missing that defines whether a broad or narrow peak will be used. Please check!"
+        sys.exit()
+
     d = {} # key: column name, value: column
 
+    # Obtain column index from file header
     for i in range(len(header)):
         colname=header[i]
         d[colname]=map(lambda x: x.split('\t')[i],c)
@@ -169,11 +177,8 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
     sample_names = info_dict["Sample"]
 
     # Obtain input DNA sample
-    if "Input" not in info_dict:
-        print "No input DNA is provided."
-        controls = [" "] * len(sample_names)
-    elif "Input" in info_dict:
-        controls = info_dict["Input"]
+    controls = info_dict["Input"]
+    controls = [x if x!="NA" else " " for x in controls] # replace NA values to empty string " "
 
     #Concatenate the input files if input_bam
     if input_bam:
@@ -186,13 +191,11 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
         subprocess.Popen(input_merge,shell=True).wait()
         print "Done!"
 
-    # remove NA
-    control_idx=filter(lambda x: controls[x] not in 'NA', range(len(sample_names)))
+    # remove rows for control sample (the Antibody column is "Input")
+    antibodies = info_dict["Antibody"]
+    control_idx=filter(lambda x: antibodies[x] != 'Input', range(len(sample_names)))
 
     # Obtain peak information
-    if "Peak" not in info_dict:
-        print "Peak column that specifies narrow or broad peak is missing. Please check!"
-
     peaks = info_dict["Peak"]
     peak_filt=map(lambda x: peaks[x], control_idx)
     if any(map(lambda x:x not in ['narrow','broad'], peak_filt)):
@@ -205,7 +208,10 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
         curr_sample=sample_names[i]
         curr_control=controls[i]
         curr_peak=peaks[i]
-        print "treatment and control pair: "+curr_sample+"+"+curr_control
+        if curr_control==" ":
+            print "ChIP-Seq sample and no DNA input control: "+curr_sample+" (Peak="+curr_peak+")"
+        else:
+            print "ChIP-Seq and DNA input control pair: "+curr_sample+"+"+curr_control+" (Peak="+curr_peak+")"
 
         ###
         # Peak calling
@@ -229,7 +235,7 @@ def main(sample_info_file, project_name, ref_genome, path_start, template_dir,in
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Write and execute an lsf job to perform QC and read alignment for RNA-seq samples associated with a project.")
     parser.add_argument("--project_name", type=str, help="Prefix name of for output directory and files")
-    parser.add_argument("--samples_in", help="A tab-delimited txt file containing sample information with full path. See example file: sample_info_file.txt")
+    parser.add_argument("--samples_in", help="A tab-delimited txt file containing sample information with full path (required columns: Sample, Antibody, Input, Peak). See example file: sample_info_file.txt")
     parser.add_argument("--ref_genome", default="hg38", type=str, help="Specify reference genome to filter out blacklisted regions (options: hg38, hg19, mm38, mm10, rn6)")
     parser.add_argument("--path_start", default="./", type=str, help="Directory path where project-level directories are located and report directory will be written (default=./)")
     parser.add_argument("--template_dir", default="./", type=str, help="directory to put provided or user defined reference index files")

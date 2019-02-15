@@ -152,8 +152,7 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
     outp.write("Create bam read columns\n")
     outp.write("```{r bamReads, eval=T, echo=F}\n")
     outp.write("coldata$bamReads=paste0(path_start,coldata$Sample,'/bwa_out/',coldata$Sample,'.bam')\n")
-    outp.write("if('Input' %in% colnames(coldata)){bamreads=coldata$bamReads[!is.na(coldata$Input)]\n")
-    outp.write("} else {bamreads=coldata$bamReads}\n")
+    outp.write("bamreads=coldata$bamReads[which(!coldata$Antibody%in%'Input')]\n")
     outp.write("nobamReads=bamreads[!sapply(bamreads,file.exists)]\n")
     outp.write("if (length(nobamReads)>1) {stop('Bam read file(s) do not exists: ',paste(nobamReads,collapse=', '))}\n")
     outp.write("```\n\n")
@@ -161,8 +160,11 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
     # create DiffBind bam control files
     outp.write("Create bam control columns\n")
     outp.write("```{r bamControl, eval=T, echo=F}\n")
-    outp.write("if('Input' %in% colnames(coldata)){coldata$bamControl=paste0(path_start,coldata$Input,'/bwa_out/',coldata$Input,'.bam')\n")
-    outp.write("bamcontrols=coldata$bamControl[!is.na(coldata$Input)]\n")
+    outp.write("coldata$bamControl=sapply(coldata$Input, function(x){\n")
+    outp.write("if (is.na(x)){NA} else {paste0(path_start, as.character(x),'/bwa_out/',x,'.bam')}\n")
+    outp.write("})\n")
+    outp.write("if (any(!is.na(coldata$Input))) {\n")
+    outp.write("bamcontrols=coldata$bamControl[(!coldata$Antibody%in%'Input')&(!is.na(coldata$Input))]\n")
     outp.write("nobamControl=bamcontrols[!sapply(bamcontrols,file.exists)]\n")
     outp.write("if (length(nobamControl)>1) {stop('Bam control file(s) do not exists: ',paste(nobamControl,collapse=', '))}}\n")
     outp.write("```\n\n")
@@ -171,13 +173,10 @@ def make_diffbind_html(rmd_template, project_name, path_start, sample_info_file,
     outp.write("Create peak bed columns\n")
     outp.write("```{r bed, eval=T, echo=F}\n")
     outp.write("coldata$Peaks=paste0(path_start,coldata$Sample,'/macs2_out/',coldata$Sample,'.blackfilt.bed')\n")
-    outp.write("if('Input' %in% colnames(coldata)){bedpeaks=coldata$Peaks[!is.na(coldata$Input)]\n")
-    outp.write("} else {bedpeaks=coldata$Peaks}\n")
+    outp.write("bedpeaks=coldata$Peaks[which(!coldata$Antibody%in%'Input')]\n")
     outp.write("nobed=bedpeaks[!sapply(bedpeaks,file.exists)]\n")
     outp.write("if (length(nobed)>1) {stop('Peak bed file(s) do not exists: ',paste(nobed,collapse=', '))}\n")
     outp.write("```\n\n")
-
-
 
     #create and paste the portion of the report that is unique to each comparison
     for line in comps:

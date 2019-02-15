@@ -346,7 +346,7 @@ coldata$bamControl=sapply(coldata$Input, function(x){
 if (is.na(x)){NA} else {paste0(path_start, as.character(x),'/bwa_out/',x,'.bam')}
 })
 if (any(!is.na(coldata$Input))) {
-bamcontrols=coldata$bamControl[which(!coldata$Antibody%in%"Input")&(!is.na(coldata$Input))]
+bamcontrols=coldata$bamControl[(!coldata$Antibody%in%"Input")&(!is.na(coldata$Input))]
 nobamControl=bamcontrols[!sapply(bamcontrols,file.exists)]
 if (length(nobamControl)>1) {stop('Bam control file(s) do not exists: ',paste(nobamControl,collapse=', '))}}
 

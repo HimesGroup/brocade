@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import argparse
+import re
 import sys
 import subprocess
 import os
@@ -184,6 +185,17 @@ def make_adapter_fa(curr_sample, out_dir, curr_index, index_dict):
     outp.write("\n")
     outp.close()
 
+def name_fastqc(filename):
+    """
+    Create filename prefix of fastqc output
+    """
+
+    # extract basename
+    filename=os.path.basename(filename)
+    # remove extension
+    filename=re.split("\.fastq\.|\.fastq$|\.txt$",filename)[0]
+    return(filename)
+
 def trim_and_fastqc(curr_sample, curr_index, out_dir, R1, R2, R1_trim, R2_trim):
     """
     Use Trimmomatic to trim adaptor and perform fastqc
@@ -219,14 +231,22 @@ def trim_and_fastqc(curr_sample, curr_index, out_dir, R1, R2, R1_trim, R2_trim):
         print curr_sample+" fastqc results already exist. Skip fastqc."
     else:
         # Run fastqc
-        cmd=cmd+"fastqc -o "+out_dir+" "+R1_trim+" "+R2_trim+"\n" # since R2 could be "", no harm to add an empty string directly here
+        cmd=cmd+"fastqc -o "+out_dir+" --extract "+R1_trim+" "+R2_trim+"\n" # since R2 could be "", no harm to add an empty string directly here
         if curr_index=='NA': # use no-trimmed files
-            # original fastqc .zip file name
-            R1_org_name=out_dir+curr_sample+"_fastqc.zip"
-            cmd=cmd+"cp "+R1_org_name+" "+R1_fastqc_fn+"\n"
+            # retrieve original sample name without path and fastq extension
+            R1_org_name=out_dir+name_fastqc(R1_trim)+"_fastqc" # change the path for original fastq file
+            # rename fastqc result folder to current name
+            cmd=cmd+"cd "+out_dir+"; mv "+R1_org_name+" "+curr_sample+"_R1_Trimmed_fastqc\n"
+            # create zip file
+            cmd=cmd+"zip -rm "+R1_fastqc_fn+" "+curr_sample+"_R1_Trimmed_fastqc\n"
             if R2_trim!="": # if R2 exists
-                R2_org_name= out_dir+curr_sample+"_fastqc.zip"
-                cmd=cmd+"cp "+R2_org_name+" "+R2_fastqc_fn+"\n"
+                # retrieve original sample name without path and fastq extension
+                R2_org_name=out_dir+name_fastqc(R2_trim)+"_fastqc" # change the path for original fastq file
+                # rename fastqc result folder to current name
+                cmd=cmd+"cd "+out_dir+"; mv "+R2_org_name+" "+curr_sample+"_R2_Trimmed_fastqc\n"
+                # create zip file
+                cmd=cmd+"zip -rm "+R2_fastqc_fn+" "+curr_sample+"_R2_Trimmed_fastqc\n"
+
 
     #Get total number of reads, unique reads, % unique reads from trimmed file(s).
     if ".gz" in R1_trim: # for gzip .fastq file

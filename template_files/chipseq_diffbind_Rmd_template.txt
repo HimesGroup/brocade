@@ -169,7 +169,7 @@ if (rep) {
 
 ### Top 50 differential binding sites
 
-If there are replicates in each condition, order by p-values; otherwise, other by absolute effect size
+If there are replicates in each condition, order by p-values; otherwise, order by absolute effect size
 
 ```{r, eval=T, echo=F}
 #output table for report

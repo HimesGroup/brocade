@@ -133,8 +133,8 @@ fastq_info_func <- function(SRA_ID) {
 
 ```{r sraFiles, eval=T, echo=F, message=F, warning=F}
 # download SRAmetadb.sqlite if it does not exist
-if (!file.exists("SRAmetadb.sqlite")) {
-  sqlfile <<- getSRAdbFile()
+if (!file.exists(paste0(out_dir, "/SRAmetadb.sqlite"))) {
+  sqlfile <- getSRAdbFile()
   sra_con <- dbConnect(SQLite(),sqlfile)
 } else {
   sra_con <- dbConnect(SQLite(),dbname="SRAmetadb.sqlite")

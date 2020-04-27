@@ -295,7 +295,7 @@ def bwa_and_bamstat(curr_sample, out_dir, library_type, R1_trim, R2_trim, bwa_in
 
     return cmd
 
-def bam2bw_and_track(curr_sample, curr_color, out_dir, template_dir, track_fn, bigdata_path, len_fn):
+def bam2bw_and_track(curr_sample, curr_color, track_fn, bigdata_path, len_fn):
     """
     Convert bam to bw file
     """
@@ -498,7 +498,7 @@ def main(sample_info_file, project_name, ref_genome, library_type, index_type, p
 
         if bam2bw:
             curr_color=colors[i]
-            bam2bw_cmd=bam2bw_and_track(curr_sample, curr_color, out_dir, template_dir, track_fn, bigdata_path, len_fn)
+            bam2bw_cmd=bam2bw_and_track(curr_sample, curr_color, track_fn, bigdata_path, len_fn)
             cmd=cmd+bam2bw_cmd
 
         ###

@@ -67,7 +67,7 @@ chipseeker_version="1.14.2"
 ###
 
 memory=36000
-queue="legacy" # normal or legacy
+queue="normal" # normal or legacy
 
 ###
 # Genes of interest
